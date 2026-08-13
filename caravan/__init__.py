@@ -1,23 +1,67 @@
 """Application factory for the Caravan Fresh platform (stdlib sqlite3 backend)."""
 import os
+import tempfile
 from datetime import timedelta
 
 from flask import Flask, redirect, url_for
 from werkzeug.middleware.proxy_fix import ProxyFix
 
-from config import Config
+from config import Config, BASE_DIR
 from . import data
 from .auth_core import current_user, load_logged_in_user
 from .constants import (ROLE_LABELS, ROLE_OFFICER, ROLE_FRANCHISE,
                         ROLE_MANAGEMENT, ROLE_FINANCE, ROLE_ADMIN)
 
 
+def _writable(path):
+    """True if we can create `path` and write a file inside it."""
+    try:
+        os.makedirs(path, exist_ok=True)
+        probe = os.path.join(path, ".write_test")
+        with open(probe, "w") as fh:
+            fh.write("ok")
+        os.remove(probe)
+        return True
+    except Exception:
+        return False
+
+
+def _resolve_data_dir(preferred):
+    """Pick the first writable data directory, falling back gracefully.
+
+    Order: the configured DATA_DIR (e.g. a mounted disk at /var/data) ->
+    the project folder -> a temp dir. This prevents a hard crash when
+    DATA_DIR points at a disk that isn't mounted (e.g. no persistent disk
+    on a free plan)."""
+    candidates = [preferred, BASE_DIR, os.path.join(tempfile.gettempdir(),
+                                                    "caravan_fresh")]
+    for path in candidates:
+        if path and _writable(path):
+            return path, (path != preferred)
+    # last resort: temp dir (should always work)
+    fallback = os.path.join(tempfile.gettempdir(), "caravan_fresh")
+    os.makedirs(fallback, exist_ok=True)
+    return fallback, True
+
+
 def create_app(config_class=Config):
     app = Flask(__name__)
     app.config.from_object(config_class)
-    app.config["DB_PATH"] = config_class.DB_PATH
     app.permanent_session_lifetime = timedelta(
         days=app.config.get("PERMANENT_SESSION_DAYS", 7))
+
+    # --- Resolve a writable data directory (with fallback) --------------
+    data_dir, fell_back = _resolve_data_dir(app.config["DATA_DIR"])
+    app.config["DATA_DIR"] = data_dir
+    # Recompute DB path / upload folder from the resolved dir unless the
+    # operator pinned them explicitly via their own env vars.
+    if not os.environ.get("DB_PATH"):
+        app.config["DB_PATH"] = os.path.join(data_dir, "caravan_fresh.db")
+    if not os.environ.get("UPLOAD_FOLDER"):
+        app.config["UPLOAD_FOLDER"] = os.path.join(data_dir, "uploads")
+    if fell_back:
+        print(f"[config] DATA_DIR not writable; using '{data_dir}' instead. "
+              f"Data here is EPHEMERAL — attach a persistent disk for durability.")
 
     # Fail fast if someone ships to production without a real secret key.
     if app.config.get("IS_PRODUCTION") and \
@@ -31,7 +75,6 @@ def create_app(config_class=Config):
         app.wsgi_app = ProxyFix(app.wsgi_app, x_for=hops, x_proto=hops,
                                 x_host=hops, x_port=hops)
 
-    os.makedirs(app.config["DATA_DIR"], exist_ok=True)
     os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
 
     app.teardown_appcontext(data.close_conn)
