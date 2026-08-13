@@ -1,0 +1,34 @@
+# Render Blueprint — deploys the Caravan Fresh platform as a web service.
+# In the Render dashboard: New +  ->  Blueprint  ->  connect this repo.
+# Render reads this file and provisions everything below automatically.
+services:
+  - type: web
+    name: caravan-fresh
+    runtime: python
+    plan: starter          # "starter" (paid) is required for a persistent disk.
+                            # Use "free" to try it, but see the disk note below.
+    region: singapore       # pick the region closest to your users
+    branch: main
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "gunicorn --preload -w 2 -k gthread --threads 4 -b 0.0.0.0:$PORT --timeout 120 wsgi:app"
+    healthCheckPath: /healthz
+    autoDeploy: true
+    envVars:
+      - key: ENV
+        value: production
+      - key: PYTHON_VERSION
+        value: "3.12.6"
+      - key: SECRET_KEY
+        generateValue: true       # Render generates a strong secret for you
+      - key: SEED_MODE
+        value: demo               # demo | minimal | none
+      - key: DATA_DIR
+        value: /var/data          # must match the disk mountPath below
+      - key: PROXY_FIX_HOPS
+        value: "1"
+    # Persistent disk so the SQLite database + uploaded evidence survive
+    # restarts and redeploys. Requires a paid instance type (starter+).
+    disk:
+      name: caravan-data
+      mountPath: /var/data
+      sizeGB: 1

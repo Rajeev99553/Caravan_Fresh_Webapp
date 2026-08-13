@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m %}
+{% block title %}Score Trace{% endblock %}
+{% block content %}
+<h4 class="fw-bold mb-1">Score Traceability</h4>
+<div class="text-muted small mb-3">{{ store.code }} — {{ store.name }} · Period {{ period }}</div>
+
+{% if ms %}
+<div class="card mb-3">
+  <div class="card-body">
+    <div class="d-flex align-items-center gap-3 flex-wrap">
+      {{ m.score_ring(ms.final_score, ms.band) }}
+      <div>
+        <div class="fs-5 fw-bold">Final {{ '%.2f'|format(ms.final_score) }} {{ m.band_badge(ms.band) }}</div>
+        <div class="small text-muted">Weights {{ ms.weight_snapshot }} · Rule {{ ms.rule_version }} · {{ ms.status }}
+          {% if ms.approved_by %}· approved by {{ ms.approved_by.name }}{% endif %}</div>
+      </div>
+    </div>
+    <hr>
+    <div class="row text-center g-2">
+      <div class="col-4"><div class="fw-bold fs-5">{{ '%.1f'|format(ms.audit_score) }}</div><div class="small text-muted">Audit</div></div>
+      <div class="col-4"><div class="fw-bold fs-5">{{ '%.1f'|format(ms.compliance_score) }}</div><div class="small text-muted">Compliance</div></div>
+      <div class="col-4"><div class="fw-bold fs-5">{{ '%.1f'|format(ms.customer_score) }}</div><div class="small text-muted">Customer</div></div>
+    </div>
+  </div>
+</div>
+{% else %}
+<div class="alert alert-warning">Monthly score not yet generated for this period.</div>
+{% endif %}
+
+<div class="trace-step">
+  <h6><i class="bi bi-geo-alt"></i> Audit visits ({{ visits|length }})</h6>
+  {% for v in visits %}
+    <div class="small mb-1">{{ v.check_in_at.strftime('%d %b') if v.check_in_at else v.scheduled_date }} — score {{ '%.0f'|format(v.audit_score or 0) }}/100
+      {% if v.gps_valid %}<i class="bi bi-geo-alt-fill text-success"></i>{% endif %}
+      {% if v.has_critical_exception %}<span class="badge bg-danger">critical</span>{% endif %}
+      · <a href="{{ url_for('audit.visit_detail', visit_id=v.id) }}">evidence</a></div>
+  {% else %}<div class="small text-muted">No completed visits this period.</div>{% endfor %}
+</div>
+
+<div class="trace-step">
+  <h6><i class="bi bi-clipboard-check"></i> Compliance entries ({{ entries|length }})</h6>
+  {% for e in entries %}
+    <div class="small mb-1">{{ e.kpi.name }} — {{ e.status }}
+      <span class="badge {% if e.validation_status=='accepted' %}bg-success{% elif e.validation_status=='rejected' %}bg-danger{% else %}bg-secondary{% endif %}">{{ e.validation_status }}</span></div>
+  {% else %}<div class="small text-muted">No compliance entries this period.</div>{% endfor %}
+</div>
+
+<div class="trace-step">
+  <h6><i class="bi bi-chat-square-quote"></i> Customer reviews ({{ reviews|length }})</h6>
+  {% for r in reviews %}
+    <div class="small mb-1">{{ '★'*(r.rating|int) }} <span class="text-muted">{{ r.text }}</span>
+      <span class="badge {% if r.sentiment=='positive' %}bg-success{% elif r.sentiment=='negative' %}bg-danger{% else %}bg-secondary{% endif %}">{{ r.sentiment }}</span></div>
+  {% else %}<div class="small text-muted">No reviews this period.</div>{% endfor %}
+</div>
+{% endblock %}

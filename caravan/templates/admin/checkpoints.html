@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Checkpoints{% endblock %}
+{% block content %}
+<h4 class="fw-bold mb-3">Audit Checkpoint Masters</h4>
+<div class="row g-3">
+  <div class="col-lg-7">
+    <div class="card"><div class="card-body p-0"><div class="table-responsive">
+      <table class="table align-middle mb-0">
+        <thead><tr><th>Code</th><th>Checkpoint</th><th>Max</th><th>Wt</th><th>Critical</th><th>Active</th></tr></thead>
+        <tbody>
+        {% for c in checkpoints %}
+          <tr class="{% if not c.active %}text-muted{% endif %}">
+            <td>{{ c.code }}</td><td>{{ c.name }}<div class="small text-muted">{{ c.category }}</div></td>
+            <td>{{ c.max_score }}</td><td>{{ c.weight }}</td>
+            <td>{% if c.is_critical %}<span class="badge bg-danger">Yes</span>{% else %}—{% endif %}</td>
+            <td><form method="post" action="{{ url_for('admin.toggle_checkpoint', cid=c.id) }}"><button class="btn btn-sm {% if c.active %}btn-success{% else %}btn-outline-secondary{% endif %}">{{ 'On' if c.active else 'Off' }}</button></form></td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div></div></div>
+  </div>
+  <div class="col-lg-5">
+    <div class="card"><div class="card-header">Add checkpoint</div><div class="card-body">
+      <form method="post">
+        <input name="code" class="form-control form-control-sm mb-2" placeholder="Code (e.g. CP-11)" required>
+        <input name="name" class="form-control form-control-sm mb-2" placeholder="Checkpoint name" required>
+        <input name="category" class="form-control form-control-sm mb-2" placeholder="Category (Hygiene, Stock…)">
+        <div class="row g-2 mb-2">
+          <div class="col"><input name="max_score" type="number" value="10" class="form-control form-control-sm" placeholder="Max"></div>
+          <div class="col"><input name="weight" type="number" step="0.5" value="1" class="form-control form-control-sm" placeholder="Weight"></div>
+        </div>
+        <div class="form-check mb-2"><input type="checkbox" name="is_critical" class="form-check-input" id="crit"><label for="crit" class="form-check-label small">Critical checkpoint</label></div>
+        <button class="btn btn-success btn-sm" style="background:#0f5132;border:none;">Add checkpoint</button>
+      </form>
+    </div></div>
+  </div>
+</div>
+{% endblock %}

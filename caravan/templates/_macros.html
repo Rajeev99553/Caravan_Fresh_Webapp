@@ -1,0 +1,29 @@
+{% macro band_badge(band) %}
+  {% if band %}
+    {% set cls = {'Platinum':'band-platinum','Gold':'band-gold','Standard':'band-standard','Improvement Required':'band-improvement'} %}
+    <span class="badge-band text-white {{ cls.get(band.name,'bg-secondary') }}"
+          style="{% if band.name not in cls %}background:#6c757d;{% endif %}">{{ band.name }}</span>
+  {% else %}
+    <span class="badge-band bg-light text-muted border">Not scored</span>
+  {% endif %}
+{% endmacro %}
+
+{% macro score_ring(score, band) %}
+  {% set cls = {'Platinum':'band-platinum','Gold':'band-gold','Standard':'band-standard','Improvement Required':'band-improvement'} %}
+  <div class="score-ring {{ cls.get(band.name,'') if band else '' }}"
+       style="{% if not band %}background:#adb5bd;{% elif band.name not in cls %}background:#6c757d;{% endif %}">
+    {{ '%.0f'|format(score or 0) }}
+  </div>
+{% endmacro %}
+
+{% macro stat(num, label, bg, icon='') %}
+  <div class="stat-card {{ bg }}">
+    <div class="d-flex justify-content-between align-items-start">
+      <div>
+        <div class="stat-num">{{ num }}</div>
+        <div class="stat-label">{{ label }}</div>
+      </div>
+      {% if icon %}<i class="bi {{ icon }} fs-4 opacity-50"></i>{% endif %}
+    </div>
+  </div>
+{% endmacro %}

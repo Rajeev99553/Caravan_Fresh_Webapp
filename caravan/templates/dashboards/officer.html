@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m %}
+{% block title %}Officer Dashboard{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+  <div>
+    <h4 class="mb-0 fw-bold">Hi, {{ current_user.name.split()[0] }}</h4>
+    <div class="text-muted small">{{ stores|length }} assigned stores</div>
+  </div>
+  <a href="{{ url_for('audit.new_visit') }}" class="btn btn-sm btn-success" style="background:#0f5132;border:none;">
+    <i class="bi bi-plus-circle"></i> New visit
+  </a>
+</div>
+
+<div class="row g-3 mb-3">
+  <div class="col-4">{{ m.stat(due|length, "Today's due", 'bg-cf-amber', 'bi-clock') }}</div>
+  <div class="col-4">{{ m.stat(completed|length, 'Completed', 'bg-cf-green', 'bi-check2-circle') }}</div>
+  <div class="col-4">{{ m.stat(missed|length, 'Missed', 'bg-cf-red', 'bi-x-octagon') }}</div>
+</div>
+
+<div class="card mb-3">
+  <div class="card-header"><i class="bi bi-calendar-day"></i> Today's route</div>
+  <div class="card-body p-0">
+    {% if todays %}
+    <div class="list-group list-group-flush">
+      {% for v in todays %}
+        <a href="{{ url_for('audit.visit_detail', visit_id=v.id) }}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+          <span><span class="fw-semibold">{{ v.store.code }}</span> — {{ v.store.name }}<br><span class="small text-muted">{{ v.store.city }}</span></span>
+          <span class="badge {% if v.status=='completed' %}bg-success{% elif v.status=='in_progress' %}bg-warning text-dark{% else %}bg-secondary{% endif %}">{{ v.status.replace('_',' ') }}</span>
+        </a>
+      {% endfor %}
+    </div>
+    {% else %}
+      <div class="p-4 text-center text-muted">No visits scheduled today. <a href="{{ url_for('audit.new_visit') }}">Schedule one →</a></div>
+    {% endif %}
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header"><i class="bi bi-clock-history"></i> Recent completed audits</div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table mb-0 align-middle">
+        <thead><tr><th>Store</th><th>Date</th><th>Score</th><th>GPS</th></tr></thead>
+        <tbody>
+        {% for v in history %}
+          <tr>
+            <td><a class="text-decoration-none" href="{{ url_for('audit.visit_detail', visit_id=v.id) }}">{{ v.store.code }}</a></td>
+            <td class="small">{{ v.check_in_at.strftime('%d %b') if v.check_in_at else v.scheduled_date }}</td>
+            <td class="fw-semibold">{{ '%.0f'|format(v.audit_score or 0) }}</td>
+            <td>{% if v.gps_valid %}<i class="bi bi-geo-alt-fill text-success"></i>{% elif v.gps_valid==False %}<i class="bi bi-geo-alt text-danger"></i>{% else %}—{% endif %}</td>
+          </tr>
+        {% else %}
+          <tr><td colspan="4" class="text-center text-muted py-3">No completed audits yet.</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

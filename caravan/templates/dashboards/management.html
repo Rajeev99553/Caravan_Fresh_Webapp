@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m %}
+{% block title %}Management Dashboard{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+  <div>
+    <h4 class="mb-0 fw-bold">Management Dashboard</h4>
+    <div class="text-muted small">Period {{ period }} · {{ scored_count }}/{{ total_stores }} stores scored</div>
+  </div>
+  <form method="post" action="{{ url_for('scoring.generate') }}">
+    <input type="hidden" name="period" value="{{ period }}">
+    <button class="btn btn-sm btn-success" style="background:#0f5132;border:none;">
+      <i class="bi bi-arrow-repeat"></i> Generate monthly scores
+    </button>
+  </form>
+</div>
+
+<div class="row g-3 mb-3">
+  <div class="col-6 col-md-3">{{ m.stat(total_stores, 'Total stores', 'bg-cf-green', 'bi-shop') }}</div>
+  <div class="col-6 col-md-3">{{ m.stat(avg, 'Avg store score', 'bg-cf-blue', 'bi-graph-up') }}</div>
+  <div class="col-6 col-md-3">{{ m.stat(avg_sentiment, 'Avg rating (★)', 'bg-cf-teal', 'bi-star') }}</div>
+  <div class="col-6 col-md-3">{{ m.stat(exceptions, 'Critical exceptions', 'bg-cf-red', 'bi-exclamation-triangle') }}</div>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-8">
+    <div class="card mb-3">
+      <div class="card-header d-flex justify-content-between">
+        <span><i class="bi bi-trophy"></i> Store ranking</span>
+        <a href="{{ url_for('scoring.home', period=period) }}" class="small text-decoration-none">Full list →</a>
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover align-middle mb-0">
+            <thead><tr><th>#</th><th>Store</th><th>Audit</th><th>Comp.</th><th>Cust.</th><th>Final</th><th>Band</th></tr></thead>
+            <tbody>
+            {% for r in rows %}
+              <tr>
+                <td>{{ loop.index }}</td>
+                <td><a class="text-decoration-none fw-semibold" href="{{ url_for('scoring.trace', store_id=r.store.id, period=period) }}">{{ r.store.code }}</a><div class="small text-muted">{{ r.store.name }}</div></td>
+                <td>{{ '%.0f'|format(r.score.audit_score) }}</td>
+                <td>{{ '%.0f'|format(r.score.compliance_score) }}</td>
+                <td>{{ '%.0f'|format(r.score.customer_score) }}</td>
+                <td class="fw-bold">{{ '%.1f'|format(r.score.final_score) }}</td>
+                <td>{{ m.band_badge(r.score.band) }}</td>
+              </tr>
+            {% else %}
+              <tr><td colspan="7" class="text-center text-muted py-4">No scores yet. Click “Generate monthly scores”.</td></tr>
+            {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-4">
+    <div class="card mb-3">
+      <div class="card-header"><i class="bi bi-diagram-3"></i> Band distribution</div>
+      <div class="card-body">
+        {% for b in bands %}
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <span>{{ m.band_badge(b) }}</span>
+            <span class="fw-semibold">{{ band_counts.get(b.name,0) }}</span>
+          </div>
+          <div class="progress mb-3" style="height:6px;">
+            <div class="progress-bar bg-success" style="width: {{ (band_counts.get(b.name,0)/scored_count*100) if scored_count else 0 }}%"></div>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="card mb-3">
+      <div class="card-header"><i class="bi bi-person-check"></i> Officer completion</div>
+      <div class="card-body">
+        {% for o in officer_stats %}
+          <div class="d-flex justify-content-between small mb-1">
+            <span>{{ o.officer.name }}</span>
+            <span class="text-muted">{{ o.done }}/{{ o.total }} visits</span>
+          </div>
+          <div class="progress mb-2" style="height:5px;">
+            <div class="progress-bar" style="width: {{ (o.done/o.total*100) if o.total else 0 }}%"></div>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-md-6">
+    <div class="card"><div class="card-header text-success"><i class="bi bi-arrow-up-circle"></i> Top performers</div>
+      <ul class="list-group list-group-flush">
+        {% for r in top %}<li class="list-group-item d-flex justify-content-between"><span>{{ r.store.code }} — {{ r.store.name }}</span><span class="fw-bold">{{ '%.1f'|format(r.score.final_score) }}</span></li>{% endfor %}
+      </ul></div>
+  </div>
+  <div class="col-md-6">
+    <div class="card"><div class="card-header text-danger"><i class="bi bi-arrow-down-circle"></i> Needs attention</div>
+      <ul class="list-group list-group-flush">
+        {% for r in bottom %}<li class="list-group-item d-flex justify-content-between"><span>{{ r.store.code }} — {{ r.store.name }}</span><span class="fw-bold">{{ '%.1f'|format(r.score.final_score) }}</span></li>{% endfor %}
+      </ul></div>
+  </div>
+</div>
+{% endblock %}

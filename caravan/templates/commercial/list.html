@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m %}
+{% block title %}Commission{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+  <h4 class="fw-bold mb-0">Commission / Incentive Engine</h4>
+  <form class="d-flex gap-2" method="get">
+    <input type="month" name="period" value="{{ period }}" class="form-control form-control-sm">
+    <button class="btn btn-sm btn-outline-secondary">View</button>
+  </form>
+</div>
+<div class="alert alert-light border small"><i class="bi bi-shield-check"></i>
+  Recommendations are calculated from approved performance bands. Nothing is paid until Finance approves and settles to ERP.</div>
+
+<div class="card">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead><tr><th>Store</th><th>Score</th><th>Band</th><th>Base</th><th>Incent %</th><th>Incentive</th><th>Deduct.</th><th>Net</th><th>Status</th><th>Action</th></tr></thead>
+        <tbody>
+        {% for r in rows %}
+          <tr>
+            <td class="fw-semibold">{{ r.score.store.code }}</td>
+            <td>{{ '%.1f'|format(r.score.final_score) }}</td>
+            <td>{{ m.band_badge(r.score.band) }}</td>
+            {% if r.rec %}
+            <td class="small">₹{{ '{:,.0f}'.format(r.rec.base_amount) }}</td>
+            <td class="small">{{ r.rec.incentive_pct }}%</td>
+            <td class="small text-success">₹{{ '{:,.0f}'.format(r.rec.incentive_amount) }}</td>
+            <td class="small text-danger" title="{{ r.rec.deduction_note }}">{{ '₹%s'|format('{:,.0f}'.format(r.rec.deductions)) if r.rec.deductions else '—' }}</td>
+            <td class="fw-bold">₹{{ '{:,.0f}'.format(r.rec.net_amount) }}</td>
+            <td><span class="badge {% if r.rec.status=='settled' %}bg-success{% elif r.rec.status=='approved' %}bg-info text-dark{% elif r.rec.status=='rejected' %}bg-danger{% else %}bg-secondary{% endif %}">{{ r.rec.status }}</span>
+              {% if r.rec.settlement_ref %}<div class="small text-muted">{{ r.rec.settlement_ref }}</div>{% endif %}</td>
+            <td class="text-nowrap">
+              {% if current_user.role in ['finance','admin'] %}
+                {% if r.rec.status=='recommended' %}
+                  <form method="post" action="{{ url_for('commercial.approve', rec_id=r.rec.id) }}" class="d-inline"><button class="btn btn-sm btn-success">Approve</button></form>
+                  <form method="post" action="{{ url_for('commercial.reject', rec_id=r.rec.id) }}" class="d-inline"><button class="btn btn-sm btn-outline-danger">Reject</button></form>
+                {% elif r.rec.status=='approved' %}
+                  <form method="post" action="{{ url_for('commercial.settle', rec_id=r.rec.id) }}" class="d-inline"><button class="btn btn-sm btn-primary"><i class="bi bi-bank"></i> Settle to ERP</button></form>
+                {% else %}—{% endif %}
+              {% else %}<span class="text-muted small">read-only</span>{% endif %}
+            </td>
+            {% else %}<td colspan="7" class="text-muted small">No recommendation</td>{% endif %}
+          </tr>
+        {% else %}
+          <tr><td colspan="10" class="text-center text-muted py-4">No approved scores for {{ period }}. Approve scores first.</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

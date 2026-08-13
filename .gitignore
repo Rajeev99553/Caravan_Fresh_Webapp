@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+env/
+
+# App data (never commit the live database or uploaded evidence)
+*.db
+*.db-wal
+*.db-shm
+caravan_fresh.db
+/var/data/
+caravan/static/uploads/*
+!caravan/static/uploads/.gitkeep
+uploads/
+
+# Local env / secrets
+.env
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+previews/
+server.log

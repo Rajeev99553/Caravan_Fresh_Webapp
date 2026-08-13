@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Validate KPIs{% endblock %}
+{% block content %}
+<h4 class="fw-bold mb-3">Validate Franchise KPIs</h4>
+<div class="text-muted small mb-3">Submissions from your assigned stores awaiting validation.</div>
+{% for e in entries %}
+<div class="card mb-2">
+  <div class="card-body py-2">
+    <div class="d-flex justify-content-between flex-wrap">
+      <div>
+        <span class="fw-semibold">{{ e.store.code }}</span> · {{ e.kpi.name }}
+        <span class="badge {% if e.status=='done' %}bg-success{% elif e.status=='partial' %}bg-warning text-dark{% else %}bg-danger{% endif %}">{{ e.status.replace('_',' ') }}</span>
+        <div class="small text-muted">{{ e.entry_date.strftime('%d %b') }} · by {{ e.submitted_by.name if e.submitted_by else '—' }}
+          {% if e.evidence %}· evidence: {{ e.evidence }}{% endif %}{% if e.remark %}· “{{ e.remark }}”{% endif %}</div>
+      </div>
+      <form method="post" action="{{ url_for('compliance.validate', entry_id=e.id) }}" class="d-flex gap-1 align-items-center">
+        <input name="remark" class="form-control form-control-sm" style="width:150px" placeholder="Note">
+        <button name="decision" value="accept" class="btn btn-sm btn-success">Accept</button>
+        <button name="decision" value="reject" class="btn btn-sm btn-outline-danger">Reject</button>
+      </form>
+    </div>
+  </div>
+</div>
+{% else %}
+  <div class="alert alert-success"><i class="bi bi-check2-circle"></i> Nothing pending validation.</div>
+{% endfor %}
+{% endblock %}

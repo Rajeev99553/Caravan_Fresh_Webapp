@@ -1,0 +1,33 @@
+:root{
+  --cf-green:#0f5132;
+  --cf-green-2:#157347;
+  --cf-lime:#8bc34a;
+  --cf-bg:#f4f7f4;
+}
+body{background:var(--cf-bg);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding-bottom:env(safe-area-inset-bottom);}
+.cf-navbar{background:linear-gradient(90deg,var(--cf-green),var(--cf-green-2));box-shadow:0 2px 8px rgba(0,0,0,.15);}
+.cf-logo{background:var(--cf-lime);color:#0f5132;width:34px;height:34px;border-radius:9px;display:inline-flex;align-items:center;justify-content:center;font-size:1.1rem;}
+.cf-navlink{color:rgba(255,255,255,.9);text-decoration:none;font-size:.92rem;}
+.cf-navlink:hover{color:#fff;}
+.cf-role-chip{background:rgba(255,255,255,.18);color:#fff;padding:.2rem .6rem;border-radius:20px;font-size:.78rem;}
+.card{border:none;border-radius:14px;box-shadow:0 1px 4px rgba(15,81,50,.08);}
+.card-header{background:#fff;border-bottom:1px solid #eef2ee;border-radius:14px 14px 0 0!important;font-weight:600;}
+.stat-card{border-radius:14px;padding:1rem 1.1rem;color:#fff;height:100%;}
+.stat-card .stat-num{font-size:1.9rem;font-weight:700;line-height:1;}
+.stat-card .stat-label{opacity:.9;font-size:.82rem;}
+.bg-cf-green{background:linear-gradient(135deg,#0f5132,#157347);}
+.bg-cf-blue{background:linear-gradient(135deg,#0d6efd,#3d8bfd);}
+.bg-cf-amber{background:linear-gradient(135deg,#d39e00,#ffca2c);}
+.bg-cf-purple{background:linear-gradient(135deg,#6f42c1,#8a63d2);}
+.bg-cf-teal{background:linear-gradient(135deg,#0aa2c0,#3dd5f3);}
+.bg-cf-red{background:linear-gradient(135deg,#b02a37,#dc3545);}
+.score-ring{width:64px;height:64px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;color:#fff;font-size:1.05rem;}
+.band-platinum{background:#5f6caf;}.band-gold{background:#d4a017;}.band-standard{background:#2e8b57;}.band-improvement{background:#c0392b;}
+.badge-band{font-size:.75rem;padding:.35em .6em;border-radius:20px;}
+.table thead th{font-size:.78rem;text-transform:uppercase;letter-spacing:.03em;color:#6c757d;}
+.login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#0f5132,#157347);}
+.login-card{max-width:410px;width:100%;border-radius:18px;}
+.demo-cred{cursor:pointer;font-size:.8rem;}
+.kpi-pill{font-size:.85rem;}
+.trace-step{border-left:3px solid var(--cf-lime);padding-left:1rem;margin-bottom:1rem;}
+@media (max-width:576px){.stat-card .stat-num{font-size:1.5rem;}}

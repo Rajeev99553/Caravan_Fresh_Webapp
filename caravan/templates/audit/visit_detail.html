@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+{% block title %}Visit · {{ v.store.code }}{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-start mb-3 flex-wrap gap-2">
+  <div>
+    <h4 class="fw-bold mb-0">{{ v.store.code }} — {{ v.store.name }}</h4>
+    <div class="text-muted small">{{ v.store.city }} · Scheduled {{ v.scheduled_date.strftime('%d %b %Y') }}</div>
+  </div>
+  <span class="badge {% if v.status=='completed' %}bg-success{% elif v.status=='in_progress' %}bg-warning text-dark{% elif v.status=='missed' %}bg-danger{% else %}bg-secondary{% endif %} fs-6">{{ v.status.replace('_',' ') }}</span>
+</div>
+
+{# ---- Check-in ---- #}
+<div class="card mb-3">
+  <div class="card-header"><i class="bi bi-geo-alt"></i> GPS Check-in</div>
+  <div class="card-body">
+    {% if v.check_in_at %}
+      <p class="mb-1"><i class="bi bi-clock"></i> Checked in {{ v.check_in_at.strftime('%d %b %H:%M') }}</p>
+      {% if v.gps_valid %}
+        <span class="badge bg-success"><i class="bi bi-check-circle"></i> GPS validated (within geofence)</span>
+      {% else %}
+        <span class="badge bg-danger"><i class="bi bi-exclamation-triangle"></i> GPS outside geofence — flagged</span>
+      {% endif %}
+      <div class="small text-muted mt-1">Lat {{ '%.5f'|format(v.check_in_lat or 0) }}, Lng {{ '%.5f'|format(v.check_in_lng or 0) }}</div>
+    {% elif current_user.role == 'audit_officer' %}
+      <p class="small text-muted">Capture your location to check in at the store.</p>
+      <form method="post" action="{{ url_for('audit.checkin', visit_id=v.id) }}" id="checkinForm">
+        <input type="hidden" name="lat" id="lat"><input type="hidden" name="lng" id="lng">
+        <button type="button" class="btn btn-success" style="background:#0f5132;border:none;" onclick="doCheckin()"><i class="bi bi-geo-alt-fill"></i> Check in with GPS</button>
+        <button type="submit" class="btn btn-outline-secondary btn-sm">Check in without GPS</button>
+        <div id="geoStatus" class="small text-muted mt-2"></div>
+      </form>
+    {% else %}<span class="text-muted">Not checked in.</span>{% endif %}
+  </div>
+</div>
+
+{# ---- Checkpoints scoring ---- #}
+<form method="post" action="{{ url_for('audit.submit_scores', visit_id=v.id) }}" enctype="multipart/form-data">
+<div class="card mb-3">
+  <div class="card-header"><i class="bi bi-ui-checks"></i> Audit checkpoints</div>
+  <div class="card-body">
+    {% set editable = current_user.role == 'audit_officer' and v.status != 'completed' %}
+    {% for cp in checkpoints %}
+      {% set r = results.get(cp.id) %}
+      <div class="border rounded p-2 mb-2">
+        <div class="d-flex justify-content-between">
+          <div><span class="fw-semibold">{{ cp.name }}</span>
+            {% if cp.is_critical %}<span class="badge bg-danger ms-1">Critical</span>{% endif %}
+            <div class="small text-muted">{{ cp.category }} · max {{ cp.max_score }} · weight {{ cp.weight }}</div></div>
+          <div style="min-width:90px">
+            <input type="number" step="0.5" min="0" max="{{ cp.max_score }}" name="score_{{ cp.id }}"
+                   value="{{ r.score if r else '' }}" class="form-control form-control-sm text-center"
+                   placeholder="0–{{ cp.max_score }}" {% if not editable %}readonly{% endif %}>
+          </div>
+        </div>
+        <div class="row g-2 mt-1">
+          <div class="col-md-8"><input type="text" name="remark_{{ cp.id }}" value="{{ r.remark if r else '' }}"
+                 class="form-control form-control-sm" placeholder="Remark" {% if not editable %}readonly{% endif %}></div>
+          <div class="col-md-4">
+            {% if editable %}<input type="file" name="photo_{{ cp.id }}" accept="image/*" capture="environment" class="form-control form-control-sm">{% endif %}
+            {% if r and r.photo_path %}<a href="{{ url_for('media', filename=r.photo_path) }}" target="_blank" class="small"><i class="bi bi-image"></i> evidence</a>{% endif %}
+          </div>
+        </div>
+      </div>
+    {% endfor %}
+    <div class="mt-2">
+      <label class="form-label small fw-semibold">Overall visit remarks</label>
+      <textarea name="visit_remarks" class="form-control" rows="2" {% if not editable %}readonly{% endif %}>{{ v.remarks or '' }}</textarea>
+    </div>
+  </div>
+  {% if current_user.role == 'audit_officer' and v.status != 'completed' %}
+  <div class="card-footer bg-white d-flex gap-2">
+    <button name="complete" value="0" class="btn btn-outline-secondary">Save draft</button>
+    <button name="complete" value="1" class="btn btn-success" style="background:#0f5132;border:none;"><i class="bi bi-check2-all"></i> Complete audit</button>
+  </div>
+  {% endif %}
+</div>
+</form>
+
+{% if v.audit_score is not none %}
+<div class="alert alert-light border d-flex justify-content-between align-items-center">
+  <span>Computed audit score for this visit</span>
+  <span class="fs-4 fw-bold text-success">{{ '%.1f'|format(v.audit_score) }}/100</span>
+</div>
+{% endif %}
+
+{% if current_user.role == 'audit_officer' and v.status not in ('completed','missed') %}
+<form method="post" action="{{ url_for('audit.mark_missed', visit_id=v.id) }}" class="mt-2"
+      onsubmit="return confirm('Mark this visit as missed?')">
+  <input type="text" name="reason" class="form-control form-control-sm d-inline w-auto" placeholder="Reason (optional)">
+  <button class="btn btn-sm btn-outline-danger">Mark missed</button>
+</form>
+{% endif %}
+{% endblock %}
+{% block scripts %}
+<script>
+function doCheckin(){
+  var s=document.getElementById('geoStatus');
+  if(!navigator.geolocation){s.textContent='Geolocation not supported; submitting without GPS.';document.getElementById('checkinForm').submit();return;}
+  s.textContent='Requesting location…';
+  navigator.geolocation.getCurrentPosition(function(p){
+    document.getElementById('lat').value=p.coords.latitude;
+    document.getElementById('lng').value=p.coords.longitude;
+    document.getElementById('checkinForm').submit();
+  },function(e){s.textContent='Location denied/unavailable — submitting without GPS.';document.getElementById('checkinForm').submit();},
+  {enableHighAccuracy:true,timeout:8000});
+}
+</script>
+{% endblock %}

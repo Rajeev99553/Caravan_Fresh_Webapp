@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m %}
+{% block title %}Admin Dashboard{% endblock %}
+{% block content %}
+<h4 class="fw-bold mb-3">Administration</h4>
+<div class="row g-3 mb-3">
+  <div class="col-6 col-md-3">{{ m.stat(stats.stores, 'Stores', 'bg-cf-green', 'bi-shop') }}</div>
+  <div class="col-6 col-md-3">{{ m.stat(stats.officers, 'Audit officers', 'bg-cf-blue', 'bi-person-badge') }}</div>
+  <div class="col-6 col-md-3">{{ m.stat(stats.franchises, 'Franchise owners', 'bg-cf-teal', 'bi-people') }}</div>
+  <div class="col-6 col-md-3">{{ m.stat(stats.users, 'Total users', 'bg-cf-purple', 'bi-person-gear') }}</div>
+</div>
+
+<div class="row g-3 mb-3">
+  <div class="col-md-8">
+    <div class="card">
+      <div class="card-header"><i class="bi bi-gear"></i> Configuration</div>
+      <div class="card-body">
+        <div class="row g-2">
+          {% for label,icon,url in [
+            ('KPI Masters','bi-list-check','admin.kpis'),
+            ('Audit Checkpoints','bi-ui-checks','admin.checkpoints'),
+            ('Scoring Weights','bi-sliders','admin.weights'),
+            ('Performance Bands','bi-trophy','admin.bands'),
+            ('Store Assignments','bi-shop','admin.stores'),
+            ('Users','bi-people','admin.users')] %}
+          <div class="col-6 col-md-4">
+            <a href="{{ url_for(url) }}" class="btn btn-outline-success w-100 text-start"><i class="bi {{ icon }}"></i> {{ label }}</a>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card h-100">
+      <div class="card-header d-flex justify-content-between"><span><i class="bi bi-journal-text"></i> Recent activity</span>
+        <a href="{{ url_for('admin.audit_log') }}" class="small text-decoration-none">All →</a></div>
+      <div class="card-body p-0">
+        <ul class="list-group list-group-flush small">
+          {% for l in recent_logs %}
+            <li class="list-group-item py-1">
+              <span class="text-muted">{{ l.timestamp.strftime('%d %b %H:%M') }}</span>
+              <span class="fw-semibold">{{ l.user_name }}</span> {{ l.action }}
+              <span class="text-muted">{{ l.entity }} {{ l.entity_id }}</span>
+            </li>
+          {% else %}<li class="list-group-item text-muted">No activity.</li>{% endfor %}
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

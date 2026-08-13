@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m %}
+{% block title %}My Store{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+  <div>
+    <h4 class="mb-0 fw-bold">My Store Performance</h4>
+    <div class="text-muted small">Period {{ period }}</div>
+  </div>
+  <a href="{{ url_for('compliance.home') }}" class="btn btn-sm btn-success" style="background:#0f5132;border:none;">
+    <i class="bi bi-clipboard-check"></i> Update daily KPIs
+  </a>
+</div>
+
+{% for d in data %}
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <span>{{ d.store.code }} — {{ d.store.name }}</span>
+    {% if d.pending %}<span class="badge bg-warning text-dark">{{ d.pending }} KPIs awaiting validation</span>{% endif %}
+  </div>
+  <div class="card-body">
+    <div class="row g-3 align-items-center">
+      <div class="col-auto text-center">
+        {{ m.score_ring(d.score.final_score if d.score else 0, d.score.band if d.score else None) }}
+        <div class="small text-muted mt-1">Monthly</div>
+      </div>
+      <div class="col">
+        {% if d.score %}
+        <div class="mb-1">{{ m.band_badge(d.score.band) }}
+          <span class="small text-muted">({{ d.score.status }})</span></div>
+        <div class="row g-2 small">
+          <div class="col-4"><div class="text-muted">Audit</div><div class="fw-semibold">{{ '%.0f'|format(d.score.audit_score) }}</div></div>
+          <div class="col-4"><div class="text-muted">Compliance</div><div class="fw-semibold">{{ '%.0f'|format(d.score.compliance_score) }}</div></div>
+          <div class="col-4"><div class="text-muted">Customer</div><div class="fw-semibold">{{ '%.0f'|format(d.score.customer_score) }}</div></div>
+        </div>
+        <a class="small" href="{{ url_for('scoring.trace', store_id=d.store.id, period=period) }}">View score breakdown →</a>
+        {% else %}
+          <div class="text-muted">Monthly score not generated yet for this period.</div>
+        {% endif %}
+      </div>
+    </div>
+    <hr>
+    <div class="small fw-semibold mb-2"><i class="bi bi-chat-square-quote"></i> Recent customer reviews</div>
+    {% for r in d.reviews %}
+      <div class="d-flex justify-content-between border-bottom py-1">
+        <span class="small">{% for i in range(r.rating|int) %}<i class="bi bi-star-fill text-warning"></i>{% endfor %}
+          <span class="text-muted">{{ r.text }}</span></span>
+        <span class="badge {% if r.sentiment=='positive' %}bg-success{% elif r.sentiment=='negative' %}bg-danger{% else %}bg-secondary{% endif %}">{{ r.sentiment }}</span>
+      </div>
+    {% else %}<div class="text-muted small">No reviews yet.</div>{% endfor %}
+  </div>
+</div>
+{% endfor %}
+{% endblock %}

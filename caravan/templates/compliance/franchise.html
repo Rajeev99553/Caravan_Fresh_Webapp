@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Daily KPIs{% endblock %}
+{% block content %}
+<h4 class="fw-bold mb-1">Daily / Periodic Compliance</h4>
+<div class="text-muted small mb-3">{{ today.strftime('%A, %d %b %Y') }} — submit today's KPI status with evidence.</div>
+
+{% for store in stores %}
+<div class="card mb-3">
+  <div class="card-header">{{ store.code }} — {{ store.name }}</div>
+  <form method="post" action="{{ url_for('compliance.submit') }}">
+    <input type="hidden" name="store_id" value="{{ store.id }}">
+    <div class="card-body">
+      {% for kpi in kpis %}
+        {% set e = submitted[store.id].get(kpi.id) %}
+        <div class="border rounded p-2 mb-2">
+          <div class="fw-semibold">{{ kpi.name }}
+            <span class="badge bg-light text-muted border kpi-pill">{{ kpi.frequency }}</span>
+            {% if e %}<span class="badge {% if e.validation_status=='accepted' %}bg-success{% elif e.validation_status=='rejected' %}bg-danger{% else %}bg-warning text-dark{% endif %} float-end">{{ e.validation_status }}</span>{% endif %}
+          </div>
+          <div class="small text-muted mb-2">{{ kpi.description }}</div>
+          <div class="row g-2">
+            <div class="col-sm-3">
+              <select name="status_{{ kpi.id }}" class="form-select form-select-sm">
+                <option value="">— status —</option>
+                {% for opt in ['done','partial','not_done'] %}
+                  <option value="{{ opt }}" {% if e and e.status==opt %}selected{% endif %}>{{ opt.replace('_',' ') }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-sm-5"><input name="evidence_{{ kpi.id }}" value="{{ e.evidence if e else '' }}" class="form-control form-control-sm" placeholder="Evidence / reference"></div>
+            <div class="col-sm-4"><input name="remark_{{ kpi.id }}" value="{{ e.remark if e else '' }}" class="form-control form-control-sm" placeholder="Remark"></div>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+    <div class="card-footer bg-white">
+      <button class="btn btn-success" style="background:#0f5132;border:none;"><i class="bi bi-send"></i> Submit for {{ store.code }}</button>
+    </div>
+  </form>
+</div>
+{% else %}
+  <div class="alert alert-info">No store is mapped to your account.</div>
+{% endfor %}
+{% endblock %}
