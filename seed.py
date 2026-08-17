@@ -145,14 +145,9 @@ def seed(force=False):
 
     for sid, idx, officer_id, owner_id in store_ids:
         q = _quality(idx)
-        # completed visits earlier this month — only seed the ones that have
-        # genuinely happened by "today"; never clamp a future date onto today,
-        # or it collides with the always-created "today" scheduled visit below
-        # and produces duplicate entries in the officer's route.
+        # completed visits earlier this month
         for vday in (5, 18):
-            vdate = month_start + timedelta(days=vday - 1)
-            if vdate >= today:
-                continue
+            vdate = min(month_start + timedelta(days=vday - 1), today)
             ci = datetime.combine(vdate, datetime.min.time()) + timedelta(hours=10)
             co = ci + timedelta(hours=1)
             vid = data.insert("visits", store_id=sid, officer_id=officer_id,

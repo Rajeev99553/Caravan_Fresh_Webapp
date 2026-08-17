@@ -1,27 +1,90 @@
 {% extends "base.html" %}
+{% from "_macros.html" import maps_link %}
 {% block title %}Stores{% endblock %}
 {% block content %}
 <h4 class="fw-bold mb-3">Stores &amp; Officer Assignment</h4>
-<div class="card"><div class="card-body p-0"><div class="table-responsive">
-  <table class="table align-middle mb-0">
-    <thead><tr><th>Code</th><th>Store</th><th>City</th><th>Owner</th><th>Assigned officer</th></tr></thead>
-    <tbody>
-    {% for s in stores %}
-      <tr>
-        <td class="fw-semibold">{{ s.code }}</td><td>{{ s.name }}</td><td class="small">{{ s.city }}</td>
-        <td class="small">{{ s.owner.name if s.owner else '—' }}</td>
-        <td>
-          <form method="post" class="d-flex gap-1">
-            <input type="hidden" name="store_id" value="{{ s.id }}">
-            <select name="officer_id" class="form-select form-select-sm" style="width:170px">
-              {% for o in officers %}<option value="{{ o.id }}" {% if s.assigned_officer_id==o.id %}selected{% endif %}>{{ o.name }}</option>{% endfor %}
-            </select>
-            <button class="btn btn-sm btn-outline-success">Assign</button>
-          </form>
-        </td>
-      </tr>
-    {% endfor %}
-    </tbody>
-  </table>
-</div></div></div>
+
+<div class="row g-3">
+  <div class="col-lg-8">
+    <div class="card"><div class="card-body p-0"><div class="table-responsive">
+      <table class="table align-middle mb-0">
+        <thead><tr><th>Code</th><th>Store</th><th>Address</th><th>City</th><th>Phone</th><th>Map</th><th>Owner</th><th>Assigned officer</th><th>Active</th><th></th></tr></thead>
+        <tbody>
+        {% for s in stores %}
+          <tr class="{% if not s.active %}text-muted{% endif %}">
+            <td class="fw-semibold">{{ s.code }}</td><td>{{ s.name }}</td>
+            <td class="small">{{ s.address or '—' }}{% if s.postal_code %} ({{ s.postal_code }}){% endif %}</td>
+            <td class="small">{{ s.city }}</td>
+            <td class="small">{{ s.phone or '—' }}</td>
+            <td>{{ maps_link(s.latitude, s.longitude) }}</td>
+            <td class="small">{{ s.owner.name if s.owner else '—' }}</td>
+            <td>
+              <form method="post" class="d-flex gap-1">
+                <input type="hidden" name="store_id" value="{{ s.id }}">
+                <select name="officer_id" class="form-select form-select-sm" style="width:150px">
+                  {% for o in officers %}<option value="{{ o.id }}" {% if s.assigned_officer_id==o.id %}selected{% endif %}>{{ o.name }}</option>{% endfor %}
+                </select>
+                <button class="btn btn-sm btn-outline-success">Assign</button>
+              </form>
+            </td>
+            <td>{% if s.active %}<i class="bi bi-check-circle-fill text-success"></i>{% else %}<i class="bi bi-x-circle text-muted"></i>{% endif %}</td>
+            <td class="text-end">
+              <div class="d-flex gap-1 justify-content-end">
+                <form method="post" action="{{ url_for('admin.toggle_store', sid=s.id) }}">
+                  <button class="btn btn-sm {% if s.active %}btn-outline-secondary{% else %}btn-outline-success{% endif %}">
+                    {{ 'Deactivate' if s.active else 'Activate' }}
+                  </button>
+                </form>
+                <form method="post" action="{{ url_for('admin.delete_store', sid=s.id) }}"
+                      onsubmit="return confirm('Permanently delete {{ s.code }}? This cannot be undone unless it has no visit/compliance history — deactivate instead is safer.')">
+                  <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+                </form>
+              </div>
+            </td>
+          </tr>
+        {% else %}
+          <tr><td colspan="10" class="text-center text-muted py-4">No stores yet.</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div></div></div>
+  </div>
+
+  <div class="col-lg-4">
+    <div class="card"><div class="card-header">Add Store</div><div class="card-body">
+      <form method="post" action="{{ url_for('admin.add_store') }}">
+        <div class="row g-2 mb-2">
+          <div class="col-5"><input name="code" class="form-control form-control-sm" placeholder="Code (e.g. CF-071)" required></div>
+          <div class="col-7"><input name="name" class="form-control form-control-sm" placeholder="Store name" required></div>
+        </div>
+        <input name="address" class="form-control form-control-sm mb-2" placeholder="Address">
+        <div class="row g-2 mb-2">
+          <div class="col-7"><input name="city" class="form-control form-control-sm" placeholder="City / Locality"></div>
+          <div class="col-5"><input name="postal_code" class="form-control form-control-sm" placeholder="Postal code"></div>
+        </div>
+        <div class="row g-2 mb-2">
+          <div class="col-7"><input name="region" class="form-control form-control-sm" placeholder="Region" value="Western Province"></div>
+          <div class="col-5"><input name="phone" class="form-control form-control-sm" placeholder="Phone"></div>
+        </div>
+        <div class="row g-2 mb-2">
+          <div class="col-6"><input name="latitude" type="number" step="any" class="form-control form-control-sm" placeholder="Latitude"></div>
+          <div class="col-6"><input name="longitude" type="number" step="any" class="form-control form-control-sm" placeholder="Longitude"></div>
+        </div>
+        <input name="monthly_base_amount" type="number" step="1" class="form-control form-control-sm mb-2" placeholder="Monthly base amount" value="0">
+        <select name="owner_id" class="form-select form-select-sm mb-2">
+          <option value="">— No owner assigned yet —</option>
+          {% for o in owners %}<option value="{{ o.id }}">{{ o.name }} ({{ o.email }})</option>{% endfor %}
+        </select>
+        <select name="officer_id" class="form-select form-select-sm mb-2">
+          <option value="">— No officer assigned yet —</option>
+          {% for o in officers %}<option value="{{ o.id }}">{{ o.name }}</option>{% endfor %}
+        </select>
+        <div class="form-text small mb-2">Add the franchise owner and sales audit officer as Users first if they don't exist yet, then come back here to link them to the store.</div>
+        <button class="btn btn-success btn-sm w-100" style="background:#0f5132;border:none;">
+          <i class="bi bi-shop"></i> Add Store
+        </button>
+      </form>
+    </div></div>
+  </div>
+</div>
 {% endblock %}
