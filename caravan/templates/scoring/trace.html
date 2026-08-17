@@ -32,7 +32,12 @@
   <h6><i class="bi bi-geo-alt"></i> Audit visits ({{ visits|length }})</h6>
   {% for v in visits %}
     <div class="small mb-1">{{ v.check_in_at.strftime('%d %b') if v.check_in_at else v.scheduled_date }} — score {{ '%.0f'|format(v.audit_score or 0) }}/100
-      {% if v.gps_valid %}<i class="bi bi-geo-alt-fill text-success"></i>{% endif %}
+      {% if v.gps_valid and v.check_in_lat and v.check_in_lng %}
+        <a href="https://www.google.com/maps/search/?api=1&query={{ v.check_in_lat }},{{ v.check_in_lng }}"
+           target="_blank" rel="noopener" title="Open check-in location in Google Maps">
+          <i class="bi bi-geo-alt-fill text-success"></i>
+        </a>
+      {% elif v.gps_valid %}<i class="bi bi-geo-alt-fill text-success"></i>{% endif %}
       {% if v.has_critical_exception %}<span class="badge bg-danger">critical</span>{% endif %}
       · <a href="{{ url_for('audit.visit_detail', visit_id=v.id) }}">evidence</a></div>
   {% else %}<div class="small text-muted">No completed visits this period.</div>{% endfor %}

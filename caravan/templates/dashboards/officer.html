@@ -48,7 +48,23 @@
             <td><a class="text-decoration-none" href="{{ url_for('audit.visit_detail', visit_id=v.id) }}">{{ v.store.code }}</a></td>
             <td class="small">{{ v.check_in_at.strftime('%d %b') if v.check_in_at else v.scheduled_date }}</td>
             <td class="fw-semibold">{{ '%.0f'|format(v.audit_score or 0) }}</td>
-            <td>{% if v.gps_valid %}<i class="bi bi-geo-alt-fill text-success"></i>{% elif v.gps_valid==False %}<i class="bi bi-geo-alt text-danger"></i>{% else %}—{% endif %}</td>
+            <td>
+              {% if v.gps_valid and v.check_in_lat and v.check_in_lng %}
+                <a href="https://www.google.com/maps/search/?api=1&query={{ v.check_in_lat }},{{ v.check_in_lng }}"
+                   target="_blank" rel="noopener" title="Open check-in location in Google Maps">
+                  <i class="bi bi-geo-alt-fill text-success"></i>
+                </a>
+              {% elif v.gps_valid==False and v.check_in_lat and v.check_in_lng %}
+                <a href="https://www.google.com/maps/search/?api=1&query={{ v.check_in_lat }},{{ v.check_in_lng }}"
+                   target="_blank" rel="noopener" title="Outside geofence — open check-in location in Google Maps">
+                  <i class="bi bi-geo-alt text-danger"></i>
+                </a>
+              {% elif v.gps_valid %}
+                <i class="bi bi-geo-alt-fill text-success"></i>
+              {% elif v.gps_valid==False %}
+                <i class="bi bi-geo-alt text-danger"></i>
+              {% else %}—{% endif %}
+            </td>
           </tr>
         {% else %}
           <tr><td colspan="4" class="text-center text-muted py-3">No completed audits yet.</td></tr>
