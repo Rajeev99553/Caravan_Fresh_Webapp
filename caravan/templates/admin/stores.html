@@ -8,10 +8,11 @@
   <div class="col-lg-8">
     <div class="card"><div class="card-body p-0"><div class="table-responsive">
       <table class="table align-middle mb-0">
-        <thead><tr><th>Code</th><th>Store</th><th>Address</th><th>City</th><th>Phone</th><th>Map</th><th>Owner</th><th>Assigned officer</th><th>Active</th><th></th></tr></thead>
+        <thead><tr><th>#</th><th>Code</th><th>Store</th><th>Address</th><th>City</th><th>Phone</th><th>Map</th><th>Owner</th><th>Assigned officer</th><th>Active</th><th></th></tr></thead>
         <tbody>
         {% for s in stores %}
           <tr class="{% if not s.active %}text-muted{% endif %}">
+            <td class="text-muted small">{{ loop.index }}</td>
             <td class="fw-semibold">{{ s.code }}</td><td>{{ s.name }}</td>
             <td class="small">{{ s.address or '—' }}{% if s.postal_code %} ({{ s.postal_code }}){% endif %}</td>
             <td class="small">{{ s.city }}</td>
@@ -43,7 +44,7 @@
             </td>
           </tr>
         {% else %}
-          <tr><td colspan="10" class="text-center text-muted py-4">No stores yet.</td></tr>
+          <tr><td colspan="11" class="text-center text-muted py-4">No stores yet.</td></tr>
         {% endfor %}
         </tbody>
       </table>

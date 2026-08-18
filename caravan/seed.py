@@ -145,11 +145,14 @@ def seed(force=False):
 
     for sid, idx, officer_id, owner_id in store_ids:
         q = _quality(idx)
-        # completed visits earlier this month — only seed the ones that have
-        # genuinely happened by "today"; never clamp a future date onto today,
-        # or it collides with the always-created "today" scheduled visit below
-        # and produces duplicate entries in the officer's route.
-        for vday in (5, 18):
+        # completed visits earlier this month — staggered per store (instead of
+        # a fixed day-5/day-18 for every store) so the "recent completed audits"
+        # list shows varied real-looking dates instead of one repeated date.
+        # Only seed visits that have genuinely happened by "today"; never clamp
+        # a future date onto today, or it collides with the always-created
+        # "today" scheduled visit below and produces duplicate route entries.
+        base_day = 2 + (idx % 24)
+        for vday in (base_day, base_day + 12):
             vdate = month_start + timedelta(days=vday - 1)
             if vdate >= today:
                 continue

@@ -153,6 +153,7 @@ def create_app(config_class=Config):
     @app.context_processor
     def inject_globals():
         return {"ROLE_LABELS": ROLE_LABELS, "app_name": "Caravan Fresh",
-                "nav_items": nav_items, "current_user": current_user}
+                "nav_items": nav_items, "current_user": current_user,
+                "ROLE_OFFICER": ROLE_OFFICER}
 
     return app

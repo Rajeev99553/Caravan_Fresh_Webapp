@@ -16,10 +16,11 @@
   <div class="card-body p-0">
     <div class="table-responsive">
       <table class="table table-hover align-middle mb-0">
-        <thead><tr><th>Store</th><th>Score</th><th>Band</th><th>Base</th><th>Incent %</th><th>Incentive</th><th>Deduct.</th><th>Net</th><th>Status</th><th>Action</th></tr></thead>
+        <thead><tr><th>#</th><th>Store</th><th>Score</th><th>Band</th><th>Base</th><th>Incent %</th><th>Incentive</th><th>Deduct.</th><th>Net</th><th>Status</th><th>Action</th></tr></thead>
         <tbody>
         {% for r in rows %}
           <tr>
+            <td class="text-muted small">{{ loop.index }}</td>
             <td class="fw-semibold">{{ r.score.store.code }}</td>
             <td>{{ '%.1f'|format(r.score.final_score) }}</td>
             <td>{{ m.band_badge(r.score.band) }}</td>

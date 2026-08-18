@@ -47,7 +47,7 @@
         <div class="d-flex justify-content-between">
           <div><span class="fw-semibold">{{ cp.name }}</span>
             {% if cp.is_critical %}<span class="badge bg-danger ms-1">Critical</span>{% endif %}
-            <div class="small text-muted">{{ cp.category }} · max {{ cp.max_score }} · weight {{ cp.weight }}</div></div>
+            <div class="small text-muted">{{ cp.category }} · max {{ cp.max_score }}{% if current_user.role != 'audit_officer' %} · weight {{ cp.weight }}{% endif %}</div></div>
           <div style="min-width:90px">
             <input type="number" step="0.5" min="0" max="{{ cp.max_score }}" name="score_{{ cp.id }}"
                    value="{{ r.score if r else '' }}" class="form-control form-control-sm text-center"
@@ -78,10 +78,15 @@
 </div>
 </form>
 
-{% if v.audit_score is not none %}
+{% if v.audit_score is not none and current_user.role != 'audit_officer' %}
 <div class="alert alert-light border d-flex justify-content-between align-items-center">
   <span>Computed audit score for this visit</span>
   <span class="fs-4 fw-bold text-success">{{ '%.1f'|format(v.audit_score) }}/100</span>
+</div>
+{% elif v.audit_score is not none %}
+<div class="alert alert-light border d-flex align-items-center gap-2">
+  <i class="bi bi-check2-circle text-success"></i>
+  <span>Audit submitted and recorded.</span>
 </div>
 {% endif %}
 

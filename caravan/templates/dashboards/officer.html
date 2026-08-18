@@ -41,13 +41,17 @@
   <div class="card-body p-0">
     <div class="table-responsive">
       <table class="table mb-0 align-middle">
-        <thead><tr><th>Store</th><th>Date</th><th>Score</th><th>GPS</th></tr></thead>
+        <thead><tr><th>#</th><th>Store</th><th>Date</th><th>Status</th><th>GPS</th></tr></thead>
         <tbody>
         {% for v in history %}
           <tr>
+            <td class="text-muted small">{{ loop.index }}</td>
             <td><a class="text-decoration-none" href="{{ url_for('audit.visit_detail', visit_id=v.id) }}">{{ v.store.code }}</a></td>
             <td class="small">{{ v.check_in_at.strftime('%d %b') if v.check_in_at else v.scheduled_date }}</td>
-            <td class="fw-semibold">{{ '%.0f'|format(v.audit_score or 0) }}</td>
+            <td>
+              <span class="badge bg-success"><i class="bi bi-check2-circle"></i> Completed</span>
+              {% if v.has_critical_exception %}<span class="badge bg-danger ms-1" title="Critical exception flagged">critical</span>{% endif %}
+            </td>
             <td>
               {% if v.gps_valid and v.check_in_lat and v.check_in_lng %}
                 <a href="https://www.google.com/maps/search/?api=1&query={{ v.check_in_lat }},{{ v.check_in_lng }}"
@@ -67,7 +71,7 @@
             </td>
           </tr>
         {% else %}
-          <tr><td colspan="4" class="text-center text-muted py-3">No completed audits yet.</td></tr>
+          <tr><td colspan="5" class="text-center text-muted py-3">No completed audits yet.</td></tr>
         {% endfor %}
         </tbody>
       </table>
