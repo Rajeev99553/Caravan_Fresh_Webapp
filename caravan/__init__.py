@@ -118,11 +118,12 @@ def create_app(config_class=Config):
             return []
         u = url_for
         role = current_user.role
-        items = [{"label": "Dashboard", "icon": "bi-speedometer2",
+        dashboard_label = "My Activity" if role == ROLE_OFFICER else "Dashboard"
+        items = [{"label": dashboard_label, "icon": "bi-speedometer2",
                   "url": u("dashboard.home")}]
         if role == ROLE_OFFICER:
             items += [
-                {"label": "My Visits", "icon": "bi-geo-alt", "url": u("audit.visits")},
+                {"label": "Previous Visits", "icon": "bi-clock-history", "url": u("audit.visits")},
                 {"label": "Validate KPIs", "icon": "bi-check2-square", "url": u("compliance.home")},
             ]
         elif role == ROLE_FRANCHISE:

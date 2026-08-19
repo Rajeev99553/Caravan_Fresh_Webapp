@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 
 from flask import Blueprint, render_template
 
@@ -30,18 +30,42 @@ def home():
     return _management_dashboard()
 
 
+def _ensure_todays_visits(officer):
+    """Auto-populate today's due-audit queue for an officer.
+
+    The demo/seed data only ever creates a 'today' visit for the day it was
+    seeded. On any later real day an officer would see an empty queue with
+    no way to get visits scheduled (visit creation was intentionally removed
+    from the officer UI). So every time an officer opens My Activity, make
+    sure each of their active assigned stores has a visit for today —
+    creating one if it doesn't exist yet."""
+    today = date.today()
+    stores = data.all_("stores", assigned_officer_id=officer.id, active=True)
+    existing_today = {v.store_id for v in data.all_("visits", officer_id=officer.id,
+                                                     scheduled_date=today)}
+    created = False
+    for s in stores:
+        if s.id not in existing_today:
+            data.insert("visits", store_id=s.id, officer_id=officer.id,
+                       scheduled_date=today, status="scheduled",
+                       created_at=datetime.utcnow())
+            created = True
+    if created:
+        data.commit()
+
+
 def _officer_dashboard():
     today = date.today()
+    _ensure_todays_visits(current_user)
     stores = stores_for_user(current_user)
     visits = data.all_("visits", officer_id=current_user.id)
     todays = [v for v in visits if v.scheduled_date == today]
     completed = [v for v in todays if v.status == "completed"]
-    due = [v for v in todays if v.status in ("scheduled", "in_progress")]
-    missed = [v for v in visits if v.status == "missed"]
-    history = sorted([v for v in visits if v.status == "completed"],
-                     key=lambda v: v.check_in_at or today, reverse=True)[:10]
+    remaining = [v for v in todays if v.status in ("scheduled", "in_progress")]
+    missed_today = [v for v in todays if v.status == "missed"]
     return render_template("dashboards/officer.html", stores=stores, todays=todays,
-                           completed=completed, due=due, missed=missed, history=history)
+                           completed=completed, remaining=remaining,
+                           missed_today=missed_today, today=today)
 
 
 def _franchise_dashboard():

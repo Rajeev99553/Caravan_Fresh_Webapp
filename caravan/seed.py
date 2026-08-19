@@ -132,7 +132,7 @@ def seed(force=False):
         officer_id = officer_ids[(i - 1) % 5]
         base_amount = 150000 + (i % 10) * 12000
         sid = data.insert("stores", code=f"CF-{i:03d}",
-                          name=f"Caravan Fresh {city} #{i}", city=city, region=REGION,
+                          name=f"Caravan Fresh {city}", city=city, region=REGION,
                           latitude=store["lat"], longitude=store["lng"],
                           address=store["address"], postal_code=store["postal_code"],
                           phone=store["phone"],

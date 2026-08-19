@@ -1,81 +1,41 @@
 {% extends "base.html" %}
 {% import "_macros.html" as m %}
-{% block title %}Officer Dashboard{% endblock %}
+{% block title %}My Activity{% endblock %}
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
-  <div>
-    <h4 class="mb-0 fw-bold">Hi, {{ current_user.name.split()[0] }}</h4>
-    <div class="text-muted small">{{ stores|length }} assigned stores</div>
-  </div>
-  <a href="{{ url_for('audit.new_visit') }}" class="btn btn-sm btn-success" style="background:#0f5132;border:none;">
-    <i class="bi bi-plus-circle"></i> New visit
-  </a>
+<div class="mb-3">
+  <h4 class="mb-0 fw-bold">My Activity</h4>
+  <div class="text-muted small">{{ today.strftime('%d %b %Y') }} · {{ stores|length }} assigned stores</div>
 </div>
 
 <div class="row g-3 mb-3">
-  <div class="col-4">{{ m.stat(due|length, "Today's due", 'bg-cf-amber', 'bi-clock') }}</div>
-  <div class="col-4">{{ m.stat(completed|length, 'Completed', 'bg-cf-green', 'bi-check2-circle') }}</div>
-  <div class="col-4">{{ m.stat(missed|length, 'Missed', 'bg-cf-red', 'bi-x-octagon') }}</div>
+  <div class="col-4">{{ m.stat(todays|length, "Stores Due Today", 'bg-cf-amber', 'bi-shop') }}</div>
+  <div class="col-4">{{ m.stat(completed|length, 'Audited', 'bg-cf-green', 'bi-check2-circle') }}</div>
+  <div class="col-4">{{ m.stat(remaining|length, 'Remaining', 'bg-cf-blue', 'bi-hourglass-split') }}</div>
 </div>
 
-<div class="card mb-3">
-  <div class="card-header"><i class="bi bi-calendar-day"></i> Today's route</div>
+<div class="card">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <span><i class="bi bi-shop"></i> Today's Stores</span>
+    <span class="small text-muted">{{ today.strftime('%d %b %Y') }}</span>
+  </div>
   <div class="card-body p-0">
     {% if todays %}
     <div class="list-group list-group-flush">
       {% for v in todays %}
         <a href="{{ url_for('audit.visit_detail', visit_id=v.id) }}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
-          <span><span class="fw-semibold">{{ v.store.code }}</span> — {{ v.store.name }}<br><span class="small text-muted">{{ v.store.city }}</span></span>
-          <span class="badge {% if v.status=='completed' %}bg-success{% elif v.status=='in_progress' %}bg-warning text-dark{% else %}bg-secondary{% endif %}">{{ v.status.replace('_',' ') }}</span>
+          <span class="d-flex flex-column">
+            <span class="fw-semibold">{{ v.store.name }}</span>
+            <span class="text-muted small">{{ v.store.code }}</span>
+          </span>
+          <span class="badge {% if v.status=='completed' %}bg-success{% elif v.status=='in_progress' %}bg-warning text-dark{% elif v.status=='missed' %}bg-danger{% else %}bg-secondary{% endif %}">
+            {% if v.status=='scheduled' %}Pending Audit{% else %}{{ v.status.replace('_',' ') }}{% endif %}
+          </span>
         </a>
       {% endfor %}
     </div>
     {% else %}
-      <div class="p-4 text-center text-muted">No visits scheduled today. <a href="{{ url_for('audit.new_visit') }}">Schedule one →</a></div>
+      <div class="p-4 text-center text-muted">No stores due today.</div>
     {% endif %}
-  </div>
-</div>
-
-<div class="card">
-  <div class="card-header"><i class="bi bi-clock-history"></i> Recent completed audits</div>
-  <div class="card-body p-0">
-    <div class="table-responsive">
-      <table class="table mb-0 align-middle">
-        <thead><tr><th>#</th><th>Store</th><th>Date</th><th>Status</th><th>GPS</th></tr></thead>
-        <tbody>
-        {% for v in history %}
-          <tr>
-            <td class="text-muted small">{{ loop.index }}</td>
-            <td><a class="text-decoration-none" href="{{ url_for('audit.visit_detail', visit_id=v.id) }}">{{ v.store.code }}</a></td>
-            <td class="small">{{ v.check_in_at.strftime('%d %b') if v.check_in_at else v.scheduled_date }}</td>
-            <td>
-              <span class="badge bg-success"><i class="bi bi-check2-circle"></i> Completed</span>
-              {% if v.has_critical_exception %}<span class="badge bg-danger ms-1" title="Critical exception flagged">critical</span>{% endif %}
-            </td>
-            <td>
-              {% if v.gps_valid and v.check_in_lat and v.check_in_lng %}
-                <a href="https://www.google.com/maps/search/?api=1&query={{ v.check_in_lat }},{{ v.check_in_lng }}"
-                   target="_blank" rel="noopener" title="Open check-in location in Google Maps">
-                  <i class="bi bi-geo-alt-fill text-success"></i>
-                </a>
-              {% elif v.gps_valid==False and v.check_in_lat and v.check_in_lng %}
-                <a href="https://www.google.com/maps/search/?api=1&query={{ v.check_in_lat }},{{ v.check_in_lng }}"
-                   target="_blank" rel="noopener" title="Outside geofence — open check-in location in Google Maps">
-                  <i class="bi bi-geo-alt text-danger"></i>
-                </a>
-              {% elif v.gps_valid %}
-                <i class="bi bi-geo-alt-fill text-success"></i>
-              {% elif v.gps_valid==False %}
-                <i class="bi bi-geo-alt text-danger"></i>
-              {% else %}—{% endif %}
-            </td>
-          </tr>
-        {% else %}
-          <tr><td colspan="5" class="text-center text-muted py-3">No completed audits yet.</td></tr>
-        {% endfor %}
-        </tbody>
-      </table>
-    </div>
   </div>
 </div>
 {% endblock %}
