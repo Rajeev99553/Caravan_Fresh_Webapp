@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m %}
+{% block title %}Visit Summary{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-start mb-3 flex-wrap gap-2">
+  <div>
+    <h4 class="fw-bold mb-0">{{ officer.name }}'s Visit Summary</h4>
+    <div class="text-muted small">{{ completed|length }} audits completed · {{ missed|length }} missed</div>
+  </div>
+  {% if current_user.role != 'audit_officer' %}
+  <form method="get" class="d-flex align-items-center gap-2">
+    <select name="officer_id" class="form-select form-select-sm" style="width:200px" onchange="this.form.submit()">
+      {% for o in all_officers %}
+        <option value="{{ o.id }}" {% if o.id == officer.id %}selected{% endif %}>{{ o.name }}</option>
+      {% endfor %}
+    </select>
+  </form>
+  {% endif %}
+</div>
+
+<div class="row g-3 mb-3">
+  <div class="col-6 col-md-3">{{ m.stat(avg_score, 'Avg Audit Score', 'bg-cf-green', 'bi-graph-up') }}</div>
+  <div class="col-6 col-md-3">{{ m.stat(completed|length, 'Completed', 'bg-cf-blue', 'bi-check2-circle') }}</div>
+  <div class="col-6 col-md-3">{{ m.stat(missed|length, 'Missed', 'bg-cf-red', 'bi-x-circle') }}</div>
+  <div class="col-6 col-md-3">{{ m.stat(critical_count, 'Critical Exceptions', 'bg-cf-amber', 'bi-exclamation-triangle') }}</div>
+</div>
+
+<div class="row g-3 mb-3">
+  <div class="col-lg-7">
+    <div class="card h-100">
+      <div class="card-header">Audit Score Trend</div>
+      <div class="card-body"><canvas id="scoreTrendChart" height="120"></canvas></div>
+    </div>
+  </div>
+  <div class="col-lg-5">
+    <div class="card h-100">
+      <div class="card-header">Visit Status Breakdown</div>
+      <div class="card-body"><canvas id="statusChart" height="180"></canvas></div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3 mb-3">
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header">GPS Check-in Method</div>
+      <div class="card-body"><canvas id="gpsChart" height="160"></canvas></div>
+    </div>
+  </div>
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header">Action Items Raised — Status</div>
+      <div class="card-body"><canvas id="aiChart" height="160"></canvas></div>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header">Visit History</div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead><tr><th>#</th><th>Store</th><th>Date</th><th>Status</th><th>Critical</th></tr></thead>
+        <tbody>
+        {% for v in visits|reverse %}
+          <tr>
+            <td class="text-muted small">{{ loop.index }}</td>
+            <td class="fw-semibold">{{ v.store.name }}<div class="small text-muted fw-normal">{{ v.store.code }}</div></td>
+            <td class="small">{{ v.scheduled_date.strftime('%d %b %Y') }}</td>
+            <td><span class="badge {% if v.status=='completed' %}bg-success{% elif v.status=='in_progress' %}bg-warning text-dark{% elif v.status=='missed' %}bg-danger{% else %}bg-secondary{% endif %}">{{ v.status.replace('_',' ') }}</span></td>
+            <td>{% if v.has_critical_exception %}<i class="bi bi-exclamation-triangle-fill text-danger"></i>{% else %}—{% endif %}</td>
+          </tr>
+        {% else %}
+          <tr><td colspan="5" class="text-center text-muted py-4">No visit history yet.</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script>
+var scoreTrend = {{ score_trend|tojson }};
+var statusCounts = {{ status_counts|tojson }};
+var gpsData = {valid: {{ gps_valid_count }}, no_gps: {{ gps_no_gps_count }}, invalid: {{ gps_invalid_count }}};
+var aiCounts = {{ ai_status_counts|tojson }};
+
+new Chart(document.getElementById('scoreTrendChart'), {
+  type: 'line',
+  data: {
+    labels: scoreTrend.map(function(s){ return s.date; }),
+    datasets: [{ label: 'Audit score', data: scoreTrend.map(function(s){ return s.score; }),
+      borderColor: '#0f5132', backgroundColor: 'rgba(15,81,50,0.1)', tension: 0.3, fill: true }]
+  },
+  options: { scales: { y: { min: 0, max: 100 } }, plugins: { legend: { display: false } } }
+});
+
+new Chart(document.getElementById('statusChart'), {
+  type: 'doughnut',
+  data: {
+    labels: ['Completed', 'Missed', 'Pending', 'In progress'],
+    datasets: [{ data: [statusCounts.completed, statusCounts.missed, statusCounts.scheduled, statusCounts.in_progress],
+      backgroundColor: ['#0f5132', '#dc3545', '#6c757d', '#ffc107'] }]
+  }
+});
+
+new Chart(document.getElementById('gpsChart'), {
+  type: 'bar',
+  data: {
+    labels: ['GPS validated', 'Checked in without GPS', 'Outside geofence'],
+    datasets: [{ data: [gpsData.valid, gpsData.no_gps, gpsData.invalid],
+      backgroundColor: ['#0f5132', '#6c757d', '#dc3545'] }]
+  },
+  options: { plugins: { legend: { display: false } } }
+});
+
+var aiLabels = Object.keys(aiCounts);
+new Chart(document.getElementById('aiChart'), {
+  type: 'bar',
+  data: {
+    labels: aiLabels.length ? aiLabels.map(function(k){ return k.replace(/_/g,' '); }) : ['No action items'],
+    datasets: [{ data: aiLabels.length ? aiLabels.map(function(k){ return aiCounts[k]; }) : [0],
+      backgroundColor: '#0aa2c0' }]
+  },
+  options: { indexAxis: 'y', plugins: { legend: { display: false } } }
+});
+</script>
+{% endblock %}

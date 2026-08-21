@@ -1,10 +1,10 @@
 from datetime import date, datetime
 
-from flask import Blueprint, render_template
+from flask import Blueprint, render_template, request, abort
 
 from .. import data
 from ..auth_core import current_user, login_required
-from ..constants import (ROLE_OFFICER, ROLE_FRANCHISE, ROLE_MANAGEMENT,
+from ..constants import (ROLE_OFFICER, ROLE_FRANCHISE, ROLE_STORE_STAFF, ROLE_MANAGEMENT,
                          ROLE_FINANCE, ROLE_ADMIN)
 from ..security import stores_for_user
 
@@ -23,6 +23,9 @@ def home():
         return _officer_dashboard()
     if role == ROLE_FRANCHISE:
         return _franchise_dashboard()
+    if role == ROLE_STORE_STAFF:
+        from flask import redirect, url_for
+        return redirect(url_for("action_items.home"))
     if role == ROLE_FINANCE:
         return _finance_dashboard()
     if role == ROLE_ADMIN:
@@ -66,6 +69,62 @@ def _officer_dashboard():
     return render_template("dashboards/officer.html", stores=stores, todays=todays,
                            completed=completed, remaining=remaining,
                            missed_today=missed_today, today=today)
+
+
+@dash_bp.route("/dashboard/summary")
+@login_required
+def officer_summary():
+    """Previous-visit performance summary for an audit officer, with charts.
+    Officers see their own; management/finance/admin can view any officer's
+    by passing ?officer_id=."""
+    if current_user.role == ROLE_OFFICER:
+        officer_id = current_user.id
+    elif current_user.role in (ROLE_MANAGEMENT, ROLE_FINANCE, ROLE_ADMIN):
+        officer_id = request.args.get("officer_id", type=int) or current_user.id
+    else:
+        abort(403)
+    officer = data.get("users", officer_id) or abort(404)
+    all_officers = data.all_("users", role=ROLE_OFFICER, order_by="name")
+
+    visits = data.all_("visits", officer_id=officer.id, order_by="scheduled_date")
+    completed = [v for v in visits if v.status == "completed"]
+    missed = [v for v in visits if v.status == "missed"]
+
+    score_trend = [{"date": v.scheduled_date.isoformat(), "score": round(v.audit_score or 0, 1)}
+                  for v in completed if v.audit_score is not None]
+    critical_count = sum(1 for v in completed if v.has_critical_exception)
+
+    status_counts = {"completed": len(completed), "missed": len(missed),
+                     "scheduled": sum(1 for v in visits if v.status == "scheduled"),
+                     "in_progress": sum(1 for v in visits if v.status == "in_progress")}
+
+    avg_score = round(sum(s["score"] for s in score_trend) / len(score_trend), 1) if score_trend else 0
+    gps_valid_count = sum(1 for v in completed if v.gps_valid)
+    gps_no_gps_count = sum(1 for v in completed if v.gps_valid is None)
+    gps_invalid_count = sum(1 for v in completed if v.gps_valid is False)
+
+    stores = stores_for_user(officer) if officer.role == ROLE_OFFICER else \
+        data.all_("stores", assigned_officer_id=officer.id)
+    store_ids = [s.id for s in stores]
+    action_items = []
+    if store_ids:
+        ph = ",".join("?" for _ in store_ids)
+        action_items = data.raw("action_items",
+                                f"SELECT * FROM action_items WHERE created_by_id=? "
+                                f"OR store_id IN ({ph})", [officer.id] + store_ids)
+    ai_status_counts = {}
+    for ai in action_items:
+        if ai.created_by_id != officer.id:
+            continue
+        ai_status_counts[ai.status] = ai_status_counts.get(ai.status, 0) + 1
+
+    return render_template("dashboards/officer_summary.html", officer=officer,
+                           all_officers=all_officers, visits=visits, completed=completed,
+                           missed=missed, score_trend=score_trend, status_counts=status_counts,
+                           avg_score=avg_score, critical_count=critical_count,
+                           gps_valid_count=gps_valid_count, gps_no_gps_count=gps_no_gps_count,
+                           gps_invalid_count=gps_invalid_count,
+                           ai_status_counts=ai_status_counts)
 
 
 def _franchise_dashboard():

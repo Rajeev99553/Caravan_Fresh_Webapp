@@ -39,7 +39,7 @@
         <ul class="list-group list-group-flush small">
           {% for l in recent_logs %}
             <li class="list-group-item py-1">
-              <span class="text-muted">{{ l.timestamp.strftime('%d %b %H:%M') }}</span>
+              <span class="text-muted">{{ (l.timestamp|localtime).strftime('%d %b %H:%M') }}</span>
               <span class="fw-semibold">{{ l.user_name }}</span> {{ l.action }}
               <span class="text-muted">{{ l.entity }} {{ l.entity_id }}</span>
             </li>

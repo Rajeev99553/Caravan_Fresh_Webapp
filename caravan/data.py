@@ -35,6 +35,10 @@ DATETIME_COLS = {
     "monthly_scores": {"generated_at", "approved_at"},
     "commission_recommendations": {"approved_at"},
     "audit_log": {"timestamp"},
+    "checkpoint_results": {"photo_uploaded_at"},
+    "action_items": {"created_at", "updated_at", "resolved_at", "denied_at",
+                     "resolution_photo_at", "officer_decision_at"},
+    "action_item_events": {"created_at"},
 }
 BOOL_COLS = {
     "users": {"active"},
@@ -80,6 +84,7 @@ RELATIONS = {
     "stores": {
         "owner": lambda r: get("users", r._data.get("owner_id")),
         "assigned_officer": lambda r: get("users", r._data.get("assigned_officer_id")),
+        "store_staff": lambda r: get("users", r._data.get("store_staff_id")),
     },
     "assignments": {
         "store": lambda r: get("stores", r._data.get("store_id")),
@@ -92,6 +97,20 @@ RELATIONS = {
     },
     "checkpoint_results": {
         "checkpoint": lambda r: get("checkpoint_master", r._data.get("checkpoint_id")),
+    },
+    "action_items": {
+        "store": lambda r: get("stores", r._data.get("store_id")),
+        "visit": lambda r: get("visits", r._data.get("visit_id")),
+        "checkpoint": lambda r: get("checkpoint_master", r._data.get("checkpoint_id")),
+        "created_by": lambda r: get("users", r._data.get("created_by_id")),
+        "events": lambda r: all_("action_item_events", action_item_id=r._data.get("id"),
+                                 order_by="id"),
+        "officer_photo": lambda r: first("checkpoint_results",
+                                         visit_id=r._data.get("visit_id"),
+                                         checkpoint_id=r._data.get("checkpoint_id")),
+    },
+    "action_item_events": {
+        "actor": lambda r: get("users", r._data.get("actor_id")),
     },
     "compliance_entries": {
         "store": lambda r: get("stores", r._data.get("store_id")),
@@ -290,7 +309,7 @@ CREATE TABLE IF NOT EXISTS stores(
   city TEXT, region TEXT, latitude REAL, longitude REAL,
   address TEXT, postal_code TEXT, phone TEXT,
   monthly_base_amount REAL DEFAULT 0, active INTEGER DEFAULT 1,
-  owner_id INTEGER, assigned_officer_id INTEGER);
+  owner_id INTEGER, assigned_officer_id INTEGER, store_staff_id INTEGER);
 CREATE TABLE IF NOT EXISTS assignments(
   id INTEGER PRIMARY KEY, store_id INTEGER NOT NULL, officer_id INTEGER NOT NULL,
   effective_from TEXT, effective_to TEXT);
@@ -306,7 +325,20 @@ CREATE TABLE IF NOT EXISTS visits(
   has_critical_exception INTEGER DEFAULT 0, created_at TEXT);
 CREATE TABLE IF NOT EXISTS checkpoint_results(
   id INTEGER PRIMARY KEY, visit_id INTEGER NOT NULL, checkpoint_id INTEGER NOT NULL,
-  score REAL DEFAULT 0, remark TEXT, photo_path TEXT, passed INTEGER DEFAULT 1);
+  score REAL DEFAULT 0, remark TEXT, photo_path TEXT, photo_uploaded_at TEXT,
+  passed INTEGER DEFAULT 1);
+CREATE TABLE IF NOT EXISTS action_items(
+  id INTEGER PRIMARY KEY, visit_id INTEGER NOT NULL, checkpoint_id INTEGER,
+  store_id INTEGER NOT NULL, created_by_id INTEGER,
+  description TEXT, assigned_to TEXT DEFAULT 'franchise_owner',
+  status TEXT DEFAULT 'open',
+  resolution_note TEXT, resolution_photo_path TEXT, resolution_photo_at TEXT, resolved_at TEXT,
+  denial_reason TEXT, denied_at TEXT,
+  officer_decision TEXT, officer_decision_note TEXT, officer_decision_at TEXT,
+  created_at TEXT, updated_at TEXT);
+CREATE TABLE IF NOT EXISTS action_item_events(
+  id INTEGER PRIMARY KEY, action_item_id INTEGER NOT NULL,
+  event_type TEXT, actor_id INTEGER, note TEXT, photo_path TEXT, created_at TEXT);
 CREATE TABLE IF NOT EXISTS kpi_master(
   id INTEGER PRIMARY KEY, code TEXT UNIQUE NOT NULL, name TEXT NOT NULL,
   description TEXT, frequency TEXT DEFAULT 'daily', weight REAL DEFAULT 1,
@@ -362,9 +394,14 @@ def _migrate_stores_columns(conn):
     for col in ("address", "postal_code", "phone"):
         if col not in existing:
             conn.execute(f"ALTER TABLE stores ADD COLUMN {col} TEXT")
+    if "store_staff_id" not in existing:
+        conn.execute("ALTER TABLE stores ADD COLUMN store_staff_id INTEGER")
     existing_visits = {r["name"] for r in conn.execute("PRAGMA table_info(visits)").fetchall()}
     if "no_gps_reason" not in existing_visits:
         conn.execute("ALTER TABLE visits ADD COLUMN no_gps_reason TEXT")
+    existing_cr = {r["name"] for r in conn.execute("PRAGMA table_info(checkpoint_results)").fetchall()}
+    if "photo_uploaded_at" not in existing_cr:
+        conn.execute("ALTER TABLE checkpoint_results ADD COLUMN photo_uploaded_at TEXT")
 
 
 def wipe_all():

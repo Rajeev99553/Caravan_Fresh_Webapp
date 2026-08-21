@@ -8,7 +8,7 @@
   <div class="col-lg-8">
     <div class="card"><div class="card-body p-0"><div class="table-responsive">
       <table class="table align-middle mb-0">
-        <thead><tr><th>#</th><th>Code</th><th>Store</th><th>Address</th><th>City</th><th>Phone</th><th>Map</th><th>Owner</th><th>Assigned officer</th><th>Active</th><th></th></tr></thead>
+        <thead><tr><th>#</th><th>Code</th><th>Store</th><th>Address</th><th>City</th><th>Phone</th><th>Map</th><th>Owner</th><th>Assigned officer</th><th>Store staff</th><th>Active</th><th></th></tr></thead>
         <tbody>
         {% for s in stores %}
           <tr class="{% if not s.active %}text-muted{% endif %}">
@@ -20,14 +20,19 @@
             <td>{{ maps_link(s.latitude, s.longitude) }}</td>
             <td class="small">{{ s.owner.name if s.owner else '—' }}</td>
             <td>
-              <form method="post" class="d-flex gap-1">
+              <form method="post" class="d-flex flex-column gap-1">
                 <input type="hidden" name="store_id" value="{{ s.id }}">
                 <select name="officer_id" class="form-select form-select-sm" style="width:150px">
                   {% for o in officers %}<option value="{{ o.id }}" {% if s.assigned_officer_id==o.id %}selected{% endif %}>{{ o.name }}</option>{% endfor %}
                 </select>
+                <select name="store_staff_id" class="form-select form-select-sm" style="width:150px">
+                  <option value="">— No store staff —</option>
+                  {% for st in staff %}<option value="{{ st.id }}" {% if s.store_staff_id==st.id %}selected{% endif %}>{{ st.name }}</option>{% endfor %}
+                </select>
                 <button class="btn btn-sm btn-outline-success">Assign</button>
               </form>
             </td>
+            <td class="small">{{ s.store_staff.name if s.store_staff else '—' }}</td>
             <td>{% if s.active %}<i class="bi bi-check-circle-fill text-success"></i>{% else %}<i class="bi bi-x-circle text-muted"></i>{% endif %}</td>
             <td class="text-end">
               <div class="d-flex gap-1 justify-content-end">
@@ -44,7 +49,7 @@
             </td>
           </tr>
         {% else %}
-          <tr><td colspan="11" class="text-center text-muted py-4">No stores yet.</td></tr>
+          <tr><td colspan="12" class="text-center text-muted py-4">No stores yet.</td></tr>
         {% endfor %}
         </tbody>
       </table>
@@ -80,7 +85,11 @@
           <option value="">— No officer assigned yet —</option>
           {% for o in officers %}<option value="{{ o.id }}">{{ o.name }}</option>{% endfor %}
         </select>
-        <div class="form-text small mb-2">Add the franchise owner and sales audit officer as Users first if they don't exist yet, then come back here to link them to the store.</div>
+        <select name="store_staff_id" class="form-select form-select-sm mb-2">
+          <option value="">— No store staff assigned yet —</option>
+          {% for st in staff %}<option value="{{ st.id }}">{{ st.name }} ({{ st.email }})</option>{% endfor %}
+        </select>
+        <div class="form-text small mb-2">Add the franchise owner, audit officer, and store staff as Users first if they don't exist yet, then come back here to link them to the store.</div>
         <button class="btn btn-success btn-sm w-100" style="background:#0f5132;border:none;">
           <i class="bi bi-shop"></i> Add Store
         </button>

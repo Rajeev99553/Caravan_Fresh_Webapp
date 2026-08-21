@@ -68,8 +68,10 @@ def visit_detail(visit_id):
     checkpoints = data.all_("checkpoint_master", active=True,
                             order_by="category, is_critical DESC, code")
     results = {r.checkpoint_id: r for r in data.all_("checkpoint_results", visit_id=v.id)}
+    action_items = {ai.checkpoint_id: ai for ai in data.all_("action_items", visit_id=v.id)}
     return render_template("audit/visit_detail.html", v=v,
-                           checkpoints=checkpoints, results=results)
+                           checkpoints=checkpoints, results=results,
+                           action_items=action_items)
 
 
 @audit_bp.route("/visit/<int:visit_id>/checkin", methods=["POST"])
@@ -138,13 +140,18 @@ def submit_scores(visit_id):
         except ValueError:
             score = None
         remark = request.form.get(f"remark_{cp.id}", "").strip()
+        assigned_to = request.form.get(f"assign_{cp.id}", "franchise_owner")
+        if assigned_to not in ("franchise_owner", "outlet_people", "both"):
+            assigned_to = "franchise_owner"
 
         photo_path = None
+        photo_uploaded_at = None
         file = request.files.get(f"photo_{cp.id}")
         if file and file.filename:
             fn = secure_filename(f"v{v.id}_cp{cp.id}_{file.filename}")
             file.save(os.path.join(upload_dir, fn))
             photo_path = fn
+            photo_uploaded_at = datetime.utcnow()
 
         res = existing.get(cp.id)
         if score is None:
@@ -156,6 +163,7 @@ def submit_scores(visit_id):
                     fields["remark"] = remark
                 if photo_path:
                     fields["photo_path"] = photo_path
+                    fields["photo_uploaded_at"] = photo_uploaded_at
                 if fields:
                     data.update("checkpoint_results", res.id, **fields)
                     existing[cp.id] = data.get("checkpoint_results", res.id)
@@ -166,14 +174,34 @@ def submit_scores(visit_id):
         if res is None:
             new_id = data.insert("checkpoint_results", visit_id=v.id, checkpoint_id=cp.id,
                                  score=score, remark=remark, passed=passed,
-                                 photo_path=photo_path)
+                                 photo_path=photo_path, photo_uploaded_at=photo_uploaded_at)
             existing[cp.id] = data.get("checkpoint_results", new_id)
         else:
             fields = dict(score=score, remark=remark, passed=passed)
             if photo_path:
                 fields["photo_path"] = photo_path
+                fields["photo_uploaded_at"] = photo_uploaded_at
             data.update("checkpoint_results", res.id, **fields)
             existing[cp.id] = data.get("checkpoint_results", res.id)
+
+        # A checkpoint answered "No" with an Action Item description raises
+        # (or updates) a trackable action item assigned to the franchise
+        # owner, outlet people, or both — resolved/denied by them, then
+        # verified by this officer.
+        if not passed and remark:
+            open_item = data.first("action_items", visit_id=v.id, checkpoint_id=cp.id,
+                                   status="open")
+            if open_item is None:
+                ai_id = data.insert("action_items", visit_id=v.id, checkpoint_id=cp.id,
+                                    store_id=v.store_id, created_by_id=current_user.id,
+                                    description=remark, assigned_to=assigned_to,
+                                    status="open", created_at=datetime.utcnow(),
+                                    updated_at=datetime.utcnow())
+                data.insert("action_item_events", action_item_id=ai_id, event_type="created",
+                           actor_id=current_user.id, note=remark, created_at=datetime.utcnow())
+            else:
+                data.update("action_items", open_item.id, description=remark,
+                           assigned_to=assigned_to, updated_at=datetime.utcnow())
 
     data.commit()
 

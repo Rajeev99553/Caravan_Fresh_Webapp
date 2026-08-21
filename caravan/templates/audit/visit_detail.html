@@ -18,7 +18,7 @@
   <div class="card-header"><i class="bi bi-geo-alt"></i> GPS Check-in</div>
   <div class="card-body">
     {% if v.check_in_at %}
-      <p class="mb-1"><i class="bi bi-clock"></i> Checked in {{ v.check_in_at.strftime('%d %b %H:%M') }}</p>
+      <p class="mb-1"><i class="bi bi-clock"></i> Checked in {{ (v.check_in_at|localtime).strftime('%d %b %H:%M') }}</p>
       {% if v.gps_valid %}
         <span class="badge bg-success"><i class="bi bi-check-circle"></i> GPS validated (within geofence)</span>
         <div class="small text-muted mt-1">Lat {{ '%.5f'|format(v.check_in_lat or 0) }}, Lng {{ '%.5f'|format(v.check_in_lng or 0) }} — {{ maps_link(v.check_in_lat, v.check_in_lng, label='View check-in on map') }}</div>
@@ -97,6 +97,16 @@
                      class="form-control form-control-sm remark-input" placeholder="Action Item"
                      {% if not editable %}readonly{% endif %}>
               <div class="small text-danger critical-hint d-none">Action Item required — checkpoint answered "No"</div>
+              {% set ai = action_items.get(cp.id) %}
+              <div class="assign-row mt-1 {% if answer != 'no' %}d-none{% endif %}">
+                <label class="small text-muted mb-0">Assign to:</label>
+                <select name="assign_{{ cp.id }}" class="form-select form-select-sm d-inline-block w-auto" {% if not editable %}disabled{% endif %}>
+                  <option value="franchise_owner" {% if not ai or ai.assigned_to=='franchise_owner' %}selected{% endif %}>Franchise Owner</option>
+                  <option value="outlet_people" {% if ai and ai.assigned_to=='outlet_people' %}selected{% endif %}>Outlet People</option>
+                  <option value="both" {% if ai and ai.assigned_to=='both' %}selected{% endif %}>Both</option>
+                </select>
+                {% if ai %}<span class="badge bg-light text-dark border ms-1">{{ ai.status.replace('_',' ') }}</span>{% endif %}
+              </div>
             </div>
             <div class="col-md-4">
               {% if editable %}
@@ -106,7 +116,10 @@
                   <span class="small text-success photo-filename d-none"><i class="bi bi-check-circle-fill"></i> <span class="fname"></span></span>
                 </div>
               {% endif %}
-              {% if r and r.photo_path %}<a href="{{ url_for('media', filename=r.photo_path) }}" target="_blank" class="small"><i class="bi bi-image"></i> evidence</a>{% endif %}
+              {% if r and r.photo_path %}
+                <a href="{{ url_for('media', filename=r.photo_path) }}" target="_blank" class="small d-block"><i class="bi bi-image"></i> evidence</a>
+                {% if r.photo_uploaded_at %}<span class="text-muted small">{{ (r.photo_uploaded_at|localtime).strftime('%d %b %Y, %H:%M') }}</span>{% endif %}
+              {% endif %}
             </div>
           </div>
         </div>
@@ -216,9 +229,11 @@ function submitNoGps(){
       var checked = row.querySelector('.yn-input:checked');
       var remarkInput = row.querySelector('.remark-input');
       var hint = row.querySelector('.critical-hint');
+      var assignRow = row.querySelector('.assign-row');
       var isCritical = row.dataset.critical === 'true';
       if (checked) done++;
       var isNo = checked && checked.value === '0';
+      if (assignRow) assignRow.classList.toggle('d-none', !isNo);
       if (hint) {
         var needsAction = isCritical && isNo;
         hint.classList.toggle('d-none', !needsAction);

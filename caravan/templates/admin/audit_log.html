@@ -9,7 +9,7 @@
     <tbody>
     {% for l in logs %}
       <tr>
-        <td class="small text-nowrap">{{ l.timestamp.strftime('%d %b %H:%M:%S') }}</td>
+        <td class="small text-nowrap">{{ (l.timestamp|localtime).strftime('%d %b %H:%M:%S') }}</td>
         <td class="small">{{ l.user_name }}</td>
         <td><span class="badge bg-light text-dark border">{{ l.action }}</span></td>
         <td class="small">{{ l.entity }}</td>

@@ -9,7 +9,7 @@ from datetime import date, datetime, timedelta
 from werkzeug.security import generate_password_hash
 
 from . import data
-from .constants import (ROLE_OFFICER, ROLE_FRANCHISE, ROLE_MANAGEMENT,
+from .constants import (ROLE_OFFICER, ROLE_FRANCHISE, ROLE_STORE_STAFF, ROLE_MANAGEMENT,
                         ROLE_FINANCE, ROLE_ADMIN)
 from .integrations import GoogleReviewsAdapter
 from .real_stores import REAL_STORES
@@ -111,6 +111,8 @@ def seed(force=False):
     admin_id = _mkuser("Asha Menon", "admin@caravanfresh.com", ROLE_ADMIN)
     _mkuser("Rahul Verma", "manager@caravanfresh.com", ROLE_MANAGEMENT)
     _mkuser("Priya Nair", "finance@caravanfresh.com", ROLE_FINANCE)
+    store_staff_demo_id = _mkuser("Nimal Perera", "store1@caravanfresh.com", ROLE_STORE_STAFF,
+                                  "071 555 0101")
 
     onames = ["Vikram Singh", "Meera Iyer", "Arjun Rao", "Sana Sheikh", "Karan Patel"]
     officer_ids = [_mkuser(nm, f"officer{i}@caravanfresh.com", ROLE_OFFICER,
@@ -137,7 +139,8 @@ def seed(force=False):
                           address=store["address"], postal_code=store["postal_code"],
                           phone=store["phone"],
                           monthly_base_amount=base_amount, active=1,
-                          owner_id=owner_id, assigned_officer_id=officer_id)
+                          owner_id=owner_id, assigned_officer_id=officer_id,
+                          store_staff_id=store_staff_demo_id if i == 1 else None)
         data.insert("assignments", store_id=sid, officer_id=officer_id,
                     effective_from=today - timedelta(days=90))
         store_ids.append((sid, i, officer_id, owner_id))

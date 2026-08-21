@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}Verify Actions{% endblock %}
+{% block content %}
+<h4 class="fw-bold mb-1">Verify Actions</h4>
+<div class="text-muted small mb-3">Action items your franchise owners have responded to — accept or reject each.</div>
+
+{% if items %}
+<div class="list-group">
+  {% for item in items %}
+    <div class="list-group-item">
+      <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+        <div>
+          <span class="fw-semibold">{{ item.store.code }} — {{ item.store.name }}</span>
+          <span class="badge bg-light text-dark border ms-1">{{ assignee_labels.get(item.assigned_to, item.assigned_to) }}</span>
+          <div class="mt-1">{{ item.description }}</div>
+          {% if item.officer_photo and item.officer_photo.photo_path %}
+            <a href="{{ url_for('media', filename=item.officer_photo.photo_path) }}" target="_blank" class="small d-block mt-1">
+              <i class="bi bi-image"></i> Your original evidence photo
+            </a>
+          {% endif %}
+        </div>
+        <span class="badge {% if item.status=='resolved_pending_review' %}bg-warning text-dark{% else %}bg-secondary{% endif %}">
+          {{ 'Resolved — needs review' if item.status=='resolved_pending_review' else 'Denied — needs review' }}
+        </span>
+      </div>
+
+      {% if item.status == 'resolved_pending_review' %}
+        <div class="mt-2 p-2 border rounded bg-light">
+          <div class="small fw-semibold">Franchise owner's response</div>
+          {% if item.resolution_note %}<div class="small">{{ item.resolution_note }}</div>{% endif %}
+          {% if item.resolution_photo_path %}
+            <a href="{{ url_for('media', filename=item.resolution_photo_path) }}" target="_blank" class="small d-block mt-1"><i class="bi bi-image"></i> View evidence photo</a>
+            {% if item.resolution_photo_at %}<span class="small text-muted">Uploaded {{ (item.resolution_photo_at|localtime).strftime('%d %b %Y, %H:%M') }}</span>{% endif %}
+          {% endif %}
+        </div>
+      {% else %}
+        <div class="mt-2 p-2 border rounded bg-light">
+          <div class="small fw-semibold">Denial reason</div>
+          <div class="small">{{ item.denial_reason }}</div>
+        </div>
+      {% endif %}
+
+      <form method="post" action="{{ url_for('action_items.verify', item_id=item.id) }}" class="mt-2 d-flex flex-wrap align-items-center gap-2">
+        <input type="text" name="note" class="form-control form-control-sm" style="max-width:280px" placeholder="Note (optional)">
+        <button name="decision" value="accept" class="btn btn-sm btn-success" style="background:#0f5132;border:none;">
+          <i class="bi bi-check2"></i> {{ 'Accept — confirmed resolved' if item.status=='resolved_pending_review' else 'Accept denial' }}
+        </button>
+        <button name="decision" value="reject" class="btn btn-sm btn-outline-danger">
+          <i class="bi bi-x"></i> Reject — reopen
+        </button>
+      </form>
+    </div>
+  {% endfor %}
+</div>
+{% else %}
+  <div class="text-center text-muted py-5">Nothing awaiting your verification right now.</div>
+{% endif %}
+{% endblock %}

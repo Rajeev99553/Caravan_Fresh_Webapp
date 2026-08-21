@@ -5,8 +5,8 @@ from flask import abort
 
 from . import data
 from .auth_core import current_user
-from .constants import (ROLE_OFFICER, ROLE_FRANCHISE, ROLE_MANAGEMENT,
-                        ROLE_FINANCE, ROLE_ADMIN)
+from .constants import (ROLE_OFFICER, ROLE_FRANCHISE, ROLE_STORE_STAFF,
+                        ROLE_MANAGEMENT, ROLE_FINANCE, ROLE_ADMIN)
 
 
 def roles_required(*roles):
@@ -30,6 +30,8 @@ def stores_for_user(user):
         return data.all_("stores", order_by="code", assigned_officer_id=user.id)
     if user.role == ROLE_FRANCHISE:
         return data.all_("stores", order_by="code", owner_id=user.id)
+    if user.role == ROLE_STORE_STAFF:
+        return data.all_("stores", order_by="code", store_staff_id=user.id)
     return []
 
 
@@ -40,6 +42,8 @@ def can_access_store(user, store):
         return store.assigned_officer_id == user.id
     if user.role == ROLE_FRANCHISE:
         return store.owner_id == user.id
+    if user.role == ROLE_STORE_STAFF:
+        return store.store_staff_id == user.id
     return False
 
 

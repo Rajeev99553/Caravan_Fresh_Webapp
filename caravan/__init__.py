@@ -9,7 +9,7 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 from config import Config, BASE_DIR
 from . import data
 from .auth_core import current_user, load_logged_in_user
-from .constants import (ROLE_LABELS, ROLE_OFFICER, ROLE_FRANCHISE,
+from .constants import (ROLE_LABELS, ROLE_OFFICER, ROLE_FRANCHISE, ROLE_STORE_STAFF,
                         ROLE_MANAGEMENT, ROLE_FINANCE, ROLE_ADMIN)
 
 
@@ -91,8 +91,9 @@ def create_app(config_class=Config):
     from .blueprints.scoring import score_bp
     from .blueprints.commercial import comm_bp
     from .blueprints.admin import admin_bp
+    from .blueprints.action_items import ai_bp
 
-    for bp in (auth_bp, dash_bp, audit_bp, comp_bp, score_bp, comm_bp, admin_bp):
+    for bp in (auth_bp, dash_bp, audit_bp, comp_bp, score_bp, comm_bp, admin_bp, ai_bp):
         app.register_blueprint(bp)
 
     @app.route("/")
@@ -119,28 +120,38 @@ def create_app(config_class=Config):
         u = url_for
         role = current_user.role
         dashboard_label = "My Activity" if role == ROLE_OFFICER else "Dashboard"
+        if role == ROLE_STORE_STAFF:
+            dashboard_label = "Action Items"
         items = [{"label": dashboard_label, "icon": "bi-speedometer2",
                   "url": u("dashboard.home")}]
         if role == ROLE_OFFICER:
             items += [
                 {"label": "Previous Visits", "icon": "bi-clock-history", "url": u("audit.visits")},
+                {"label": "Verify Actions", "icon": "bi-patch-check", "url": u("action_items.home")},
                 {"label": "Validate KPIs", "icon": "bi-check2-square", "url": u("compliance.home")},
+                {"label": "My Summary", "icon": "bi-graph-up", "url": u("dashboard.officer_summary")},
             ]
         elif role == ROLE_FRANCHISE:
-            items += [{"label": "Daily KPIs", "icon": "bi-clipboard-check", "url": u("compliance.home")}]
+            items += [
+                {"label": "Daily KPIs", "icon": "bi-clipboard-check", "url": u("compliance.home")},
+                {"label": "Action Items", "icon": "bi-exclamation-circle", "url": u("action_items.home")},
+            ]
         elif role == ROLE_MANAGEMENT:
             items += [
                 {"label": "Scores", "icon": "bi-bar-chart", "url": u("scoring.home")},
                 {"label": "Commercial", "icon": "bi-cash-coin", "url": u("commercial.home")},
+                {"label": "Action Items", "icon": "bi-exclamation-circle", "url": u("action_items.home")},
             ]
         elif role == ROLE_FINANCE:
             items += [
                 {"label": "Scores", "icon": "bi-bar-chart", "url": u("scoring.home")},
                 {"label": "Commission", "icon": "bi-cash-coin", "url": u("commercial.home")},
+                {"label": "Action Items", "icon": "bi-exclamation-circle", "url": u("action_items.home")},
             ]
         elif role == ROLE_ADMIN:
             items += [
                 {"label": "Scores", "icon": "bi-bar-chart", "url": u("scoring.home")},
+                {"label": "Action Items", "icon": "bi-exclamation-circle", "url": u("action_items.home")},
                 {"label": "KPIs", "icon": "bi-list-check", "url": u("admin.kpis")},
                 {"label": "Checkpoints", "icon": "bi-ui-checks", "url": u("admin.checkpoints")},
                 {"label": "Weights", "icon": "bi-sliders", "url": u("admin.weights")},
@@ -156,5 +167,16 @@ def create_app(config_class=Config):
         return {"ROLE_LABELS": ROLE_LABELS, "app_name": "Caravan Fresh",
                 "nav_items": nav_items, "current_user": current_user,
                 "ROLE_OFFICER": ROLE_OFFICER}
+
+    # All timestamps are stored in UTC. Caravan Fresh operates in Sri Lanka
+    # (UTC+5:30), so every displayed timestamp should go through this filter
+    # rather than being formatted straight from the stored UTC value.
+    SITE_TZ_OFFSET = timedelta(hours=5, minutes=30)
+
+    @app.template_filter("localtime")
+    def localtime_filter(dt):
+        if dt is None:
+            return None
+        return dt + SITE_TZ_OFFSET
 
     return app

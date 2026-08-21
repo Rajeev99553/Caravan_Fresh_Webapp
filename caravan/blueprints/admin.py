@@ -6,7 +6,7 @@ from werkzeug.security import generate_password_hash
 from .. import data
 from ..data import log_action
 from ..auth_core import current_user, login_required
-from ..constants import (ROLE_ADMIN, ROLE_OFFICER, ROLE_FRANCHISE,
+from ..constants import (ROLE_ADMIN, ROLE_OFFICER, ROLE_FRANCHISE, ROLE_STORE_STAFF,
                          ROLE_MANAGEMENT, ROLE_FINANCE, ROLE_LABELS)
 
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
@@ -126,15 +126,16 @@ def update_band(bid):
 
 
 # ---- Users & stores ------------------------------------------------------ #
-ALL_ROLES = [ROLE_ADMIN, ROLE_MANAGEMENT, ROLE_FINANCE, ROLE_OFFICER, ROLE_FRANCHISE]
+ALL_ROLES = [ROLE_ADMIN, ROLE_MANAGEMENT, ROLE_FINANCE, ROLE_OFFICER, ROLE_FRANCHISE, ROLE_STORE_STAFF]
 
 # Tables/columns that reference a user, used to decide whether a hard delete
 # is safe or whether the user must be deactivated instead.
 USER_REFERENCES = [
-    ("stores", "owner_id"), ("stores", "assigned_officer_id"),
+    ("stores", "owner_id"), ("stores", "assigned_officer_id"), ("stores", "store_staff_id"),
     ("assignments", "officer_id"), ("visits", "officer_id"),
     ("compliance_entries", "submitted_by_id"), ("compliance_entries", "validated_by_id"),
     ("monthly_scores", "approved_by_id"), ("commission_recommendations", "approved_by_id"),
+    ("action_items", "created_by_id"),
 ]
 
 
@@ -241,21 +242,24 @@ def stores():
     if request.method == "POST":
         store = data.get("stores", int(request.form["store_id"])) or abort(404)
         officer_id = int(request.form["officer_id"])
+        staff_id = request.form.get("store_staff_id") or None
         for a in data.all_("assignments", store_id=store.id, effective_to=None):
             data.update("assignments", a.id, effective_to=date.today())
         data.insert("assignments", store_id=store.id, officer_id=officer_id,
                     effective_from=date.today())
-        data.update("stores", store.id, assigned_officer_id=officer_id)
+        data.update("stores", store.id, assigned_officer_id=officer_id,
+                   store_staff_id=int(staff_id) if staff_id else None)
         log_action(current_user, "reassign_store", "Store", store.code,
-                   f"officer={officer_id}")
+                   f"officer={officer_id} store_staff={staff_id}")
         data.commit()
         flash(f"{store.code} reassigned.", "success")
         return redirect(url_for("admin.stores"))
     stores_list = data.all_("stores", order_by="code")
     officers = data.all_("users", role=ROLE_OFFICER, active=True, order_by="name")
     owners = data.all_("users", role=ROLE_FRANCHISE, active=True, order_by="name")
+    staff = data.all_("users", role=ROLE_STORE_STAFF, active=True, order_by="name")
     return render_template("admin/stores.html", stores=stores_list, officers=officers,
-                           owners=owners)
+                           owners=owners, staff=staff)
 
 
 @admin_bp.route("/stores/add", methods=["POST"])
@@ -272,6 +276,7 @@ def add_store():
     base_amount = request.form.get("monthly_base_amount", "0").strip()
     owner_id = request.form.get("owner_id") or None
     officer_id = request.form.get("officer_id") or None
+    staff_id = request.form.get("store_staff_id") or None
 
     if not code or not name:
         flash("Store code and name are required.", "danger")
@@ -292,7 +297,8 @@ def add_store():
                       postal_code=postal_code, phone=phone,
                       monthly_base_amount=base_v, active=True,
                       owner_id=int(owner_id) if owner_id else None,
-                      assigned_officer_id=int(officer_id) if officer_id else None)
+                      assigned_officer_id=int(officer_id) if officer_id else None,
+                      store_staff_id=int(staff_id) if staff_id else None)
     if officer_id:
         data.insert("assignments", store_id=sid, officer_id=int(officer_id),
                     effective_from=date.today())

@@ -1,0 +1,196 @@
+{% extends "base.html" %}
+{% block title %}Action Items{% endblock %}
+{% block content %}
+<h4 class="fw-bold mb-3">Action Items</h4>
+
+{% if items %}
+<div class="list-group">
+  {% for item in items %}
+    <div class="list-group-item">
+      <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+        <div>
+          <span class="fw-semibold">{{ item.store.code }} — {{ item.store.name }}</span>
+          <span class="badge bg-light text-dark border ms-1">{{ assignee_labels.get(item.assigned_to, item.assigned_to) }}</span>
+          <div class="mt-1">{{ item.description }}</div>
+          {% if item.officer_photo and item.officer_photo.photo_path %}
+            <div class="mt-1">
+              <a href="{{ url_for('media', filename=item.officer_photo.photo_path) }}" target="_blank" class="small">
+                <i class="bi bi-image"></i> View photo taken by the audit officer
+              </a>
+              {% if item.officer_photo.photo_uploaded_at %}
+                <span class="small text-muted"> · {{ (item.officer_photo.photo_uploaded_at|localtime).strftime('%d %b %Y, %H:%M') }}</span>
+              {% endif %}
+            </div>
+          {% endif %}
+          <div class="small text-muted mt-1">Raised {{ (item.created_at|localtime).strftime('%d %b %Y, %H:%M') }} by {{ item.created_by.name if item.created_by else '—' }}</div>
+        </div>
+        <span class="badge {% if item.status=='open' %}bg-danger{% elif 'pending_review' in item.status %}bg-warning text-dark{% elif item.status=='verified_resolved' %}bg-success{% else %}bg-secondary{% endif %}">
+          {{ status_labels.get(item.status, item.status) }}
+        </span>
+      </div>
+
+      {% if item.status == 'open' %}
+        <div class="mt-3 d-flex flex-wrap gap-2">
+          <button class="btn btn-sm btn-success" style="background:#0f5132;border:none;" data-bs-toggle="modal" data-bs-target="#resolveModal{{ item.id }}">
+            <i class="bi bi-check2-circle"></i> Resolved
+          </button>
+          <button class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#denyModal{{ item.id }}">
+            <i class="bi bi-x-circle"></i> Deny
+          </button>
+        </div>
+
+        <div class="modal fade" id="resolveModal{{ item.id }}" tabindex="-1">
+          <div class="modal-dialog modal-dialog-centered"><div class="modal-content">
+            <form method="post" action="{{ url_for('action_items.resolve', item_id=item.id) }}" enctype="multipart/form-data">
+              <div class="modal-header py-2"><span class="fw-semibold small">Mark resolved</span><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+              <div class="modal-body">
+                <p class="small text-muted">{{ item.description }}</p>
+                <label class="form-label small fw-semibold">Photo showing it's fixed <span class="text-danger">*</span></label>
+                <div class="photo-widget d-flex gap-2 align-items-center mb-2" data-modal="resolveModal{{ item.id }}">
+                  <input type="file" name="photo" accept="image/*" capture="environment" class="photo-input d-none" required>
+                  <button type="button" class="btn btn-sm btn-outline-secondary take-photo-btn"><i class="bi bi-camera"></i> Take Photo</button>
+                  <span class="small text-success photo-filename d-none"><i class="bi bi-check-circle-fill"></i> <span class="fname"></span></span>
+                </div>
+                <label class="form-label small fw-semibold">Note (optional)</label>
+                <textarea name="note" class="form-control form-control-sm" rows="2"></textarea>
+              </div>
+              <div class="modal-footer py-2">
+                <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button class="btn btn-sm btn-success" style="background:#0f5132;border:none;">Submit</button>
+              </div>
+            </form>
+          </div></div>
+        </div>
+
+        <div class="modal fade" id="denyModal{{ item.id }}" tabindex="-1">
+          <div class="modal-dialog modal-dialog-centered"><div class="modal-content">
+            <form method="post" action="{{ url_for('action_items.deny', item_id=item.id) }}">
+              <div class="modal-header py-2"><span class="fw-semibold small">Deny action item</span><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+              <div class="modal-body">
+                <p class="small text-muted">{{ item.description }}</p>
+                <label class="form-label small fw-semibold">Reason for denial <span class="text-danger">*</span></label>
+                <textarea name="reason" class="form-control form-control-sm" rows="3" required placeholder="Explain why this isn't valid or applicable"></textarea>
+              </div>
+              <div class="modal-footer py-2">
+                <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button class="btn btn-sm btn-outline-danger">Submit denial</button>
+              </div>
+            </form>
+          </div></div>
+        </div>
+      {% elif item.status == 'resolved_pending_review' %}
+        <div class="mt-2 small text-muted">
+          Waiting for the audit officer to verify your resolution.
+          {% if item.resolution_photo_path %}<a href="{{ url_for('media', filename=item.resolution_photo_path) }}" target="_blank">View photo</a>
+          {% if item.resolution_photo_at %}<span class="text-muted"> · uploaded {{ (item.resolution_photo_at|localtime).strftime('%d %b %Y, %H:%M') }}</span>{% endif %}{% endif %}
+        </div>
+      {% elif item.status == 'denied_pending_review' %}
+        <div class="mt-2 small text-muted">Denial reason: "{{ item.denial_reason }}" — waiting for officer review.</div>
+      {% elif item.status == 'verified_resolved' %}
+        <div class="mt-2 small text-success"><i class="bi bi-check-circle"></i> Verified resolved by {{ item.events[-1].actor.name if item.events else 'officer' }} on {{ (item.officer_decision_at|localtime).strftime('%d %b %Y') if item.officer_decision_at }}.</div>
+      {% elif item.status == 'verified_denied' %}
+        <div class="mt-2 small text-muted"><i class="bi bi-check-circle"></i> Denial accepted by officer.</div>
+      {% endif %}
+    </div>
+  {% endfor %}
+</div>
+{% else %}
+  <div class="text-center text-muted py-5">No action items yet.</div>
+{% endif %}
+
+{# ---- Shared camera capture modal (opened over a resolve modal) ---- #}
+<div class="modal fade" id="cameraModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header py-2">
+        <span class="fw-semibold small">Take evidence photo</span>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body text-center">
+        <video id="cameraStream" autoplay playsinline class="w-100 rounded bg-dark" style="max-height:60vh"></video>
+        <canvas id="cameraCanvas" class="d-none"></canvas>
+        <div id="cameraError" class="small text-danger mt-2 d-none">Camera unavailable. Please allow camera access in your browser and try again.</div>
+      </div>
+      <div class="modal-footer py-2">
+        <button type="button" class="btn btn-sm btn-success" style="background:#0f5132;border:none;" id="captureBtn"><i class="bi bi-camera-fill"></i> Capture</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+(function(){
+  var cameraModalEl = document.getElementById('cameraModal');
+  if (!cameraModalEl || !window.bootstrap) return;
+  var cameraModal = new bootstrap.Modal(cameraModalEl);
+  var video = document.getElementById('cameraStream');
+  var canvas = document.getElementById('cameraCanvas');
+  var errorBox = document.getElementById('cameraError');
+  var captureBtn = document.getElementById('captureBtn');
+  var stream = null;
+  var activeWidget = null;
+  var activeResolveModal = null;
+
+  function stopStream(){
+    if (stream) { stream.getTracks().forEach(function(t){ t.stop(); }); stream = null; }
+  }
+
+  function openCameraFor(widget){
+    activeWidget = widget;
+    var resolveModalId = widget.dataset.modal;
+    var resolveModalEl = document.getElementById(resolveModalId);
+    activeResolveModal = bootstrap.Modal.getOrCreateInstance(resolveModalEl);
+    activeResolveModal.hide();
+
+    errorBox.classList.add('d-none');
+    video.classList.remove('d-none');
+    cameraModal.show();
+    navigator.mediaDevices && navigator.mediaDevices.getUserMedia
+      ? navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}}).then(function(s){
+          stream = s; video.srcObject = s;
+        }).catch(function(){
+          video.classList.add('d-none'); errorBox.classList.remove('d-none');
+        })
+      : (video.classList.add('d-none'), errorBox.classList.remove('d-none'));
+  }
+
+  function setFileOnWidget(widget, file){
+    var input = widget.querySelector('.photo-input');
+    var dt = new DataTransfer();
+    dt.items.add(file);
+    input.files = dt.files;
+    var fnSpan = widget.querySelector('.photo-filename');
+    var fname = widget.querySelector('.fname');
+    fname.textContent = file.name;
+    fnSpan.classList.remove('d-none');
+  }
+
+  document.querySelectorAll('.take-photo-btn').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      openCameraFor(btn.closest('.photo-widget'));
+    });
+  });
+
+  captureBtn.addEventListener('click', function(){
+    if (!stream) return;
+    canvas.width = video.videoWidth || 640;
+    canvas.height = video.videoHeight || 480;
+    canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+    canvas.toBlob(function(blob){
+      if (!blob || !activeWidget) return;
+      var file = new File([blob], 'evidence_' + Date.now() + '.jpg', {type:'image/jpeg'});
+      setFileOnWidget(activeWidget, file);
+      cameraModal.hide();
+    }, 'image/jpeg', 0.9);
+  });
+
+  cameraModalEl.addEventListener('hidden.bs.modal', function(){
+    stopStream();
+    // reopen the resolve modal we hid to make room for the camera, so the
+    // officer/franchise owner lands back where they were with the photo set.
+    if (activeResolveModal) { activeResolveModal.show(); activeResolveModal = null; }
+  });
+})();
+</script>
+{% endblock %}
