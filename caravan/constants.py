@@ -6,7 +6,7 @@ ROLE_FINANCE = "finance"
 ROLE_ADMIN = "admin"
 
 ROLE_LABELS = {
-    ROLE_OFFICER: "Sales Audit Officer",
+    ROLE_OFFICER: "Store Audit Officer",
     ROLE_FRANCHISE: "Franchise Owner",
     ROLE_MANAGEMENT: "Management",
     ROLE_FINANCE: "Finance / Commercial",

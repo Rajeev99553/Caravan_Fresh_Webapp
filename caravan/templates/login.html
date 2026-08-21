@@ -4,15 +4,14 @@
 <div class="login-wrap position-fixed top-0 start-0 w-100">
   <div class="login-card card p-4 m-3">
     <div class="text-center mb-3">
-      <span class="cf-logo mx-auto mb-2" style="width:52px;height:52px;font-size:1.6rem;"><i
-          class="bi bi-shop"></i></span>
+      <span class="cf-logo mx-auto mb-2" style="width:52px;height:52px;font-size:1.6rem;"><i class="bi bi-shop"></i></span>
       <h4 class="fw-bold mb-0" style="color:#0f5132;">Caravan Fresh</h4>
       <div class="text-muted small">Franchise Performance &amp; Incentive Platform</div>
     </div>
     {% with messages = get_flashed_messages(with_categories=true) %}
-    {% for cat, msg in messages %}
-    <div class="alert alert-{{ cat }} py-2">{{ msg }}</div>
-    {% endfor %}
+      {% for cat, msg in messages %}
+        <div class="alert alert-{{ cat }} py-2">{{ msg }}</div>
+      {% endfor %}
     {% endwith %}
     <form method="post">
       <div class="mb-3">
@@ -29,22 +28,24 @@
     <div class="small text-muted mb-2 fw-semibold">Demo accounts — tap to fill (password: <code>demo123</code>)</div>
     <div class="d-grid gap-1">
       {% for label,email in [
-      ('Administrator','admin@caravanfresh.com'),
-      ('Management','manager@caravanfresh.com'),
-      ('Sales Audit Officer','officer1@caravanfresh.com'),
-      ('Franchise Owner','owner1@caravanfresh.com')] %}
-      <button type="button" class="btn btn-outline-secondary btn-sm demo-cred text-start" data-email="{{ email }}">
-        <i class="bi bi-person-badge"></i> {{ label }} — {{ email }}
-      </button>
+          ('Administrator','admin@caravanfresh.com'),
+          ('Management','manager@caravanfresh.com'),
+          ('Finance / Commercial','finance@caravanfresh.com'),
+          ('Store Audit Officer','officer1@caravanfresh.com'),
+          ('Franchise Owner','owner1@caravanfresh.com')] %}
+        <button type="button" class="btn btn-outline-secondary btn-sm demo-cred text-start"
+                data-email="{{ email }}">
+          <i class="bi bi-person-badge"></i> {{ label }} — {{ email }}
+        </button>
       {% endfor %}
     </div>
   </div>
 </div>
 <script>
-  document.querySelectorAll('.demo-cred').forEach(function (b) {
-    b.addEventListener('click', function () {
-      document.getElementById('email').value = this.dataset.email;
-      document.getElementById('password').value = 'demo123';
+  document.querySelectorAll('.demo-cred').forEach(function(b){
+    b.addEventListener('click',function(){
+      document.getElementById('email').value=this.dataset.email;
+      document.getElementById('password').value='demo123';
     });
   });
 </script>

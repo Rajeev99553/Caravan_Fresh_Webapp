@@ -302,7 +302,7 @@ CREATE TABLE IF NOT EXISTS visits(
   id INTEGER PRIMARY KEY, store_id INTEGER NOT NULL, officer_id INTEGER NOT NULL,
   scheduled_date TEXT, status TEXT DEFAULT 'scheduled',
   check_in_at TEXT, check_in_lat REAL, check_in_lng REAL, check_out_at TEXT,
-  gps_valid INTEGER, audit_score REAL, remarks TEXT,
+  gps_valid INTEGER, no_gps_reason TEXT, audit_score REAL, remarks TEXT,
   has_critical_exception INTEGER DEFAULT 0, created_at TEXT);
 CREATE TABLE IF NOT EXISTS checkpoint_results(
   id INTEGER PRIMARY KEY, visit_id INTEGER NOT NULL, checkpoint_id INTEGER NOT NULL,
@@ -362,6 +362,9 @@ def _migrate_stores_columns(conn):
     for col in ("address", "postal_code", "phone"):
         if col not in existing:
             conn.execute(f"ALTER TABLE stores ADD COLUMN {col} TEXT")
+    existing_visits = {r["name"] for r in conn.execute("PRAGMA table_info(visits)").fetchall()}
+    if "no_gps_reason" not in existing_visits:
+        conn.execute("ALTER TABLE visits ADD COLUMN no_gps_reason TEXT")
 
 
 def wipe_all():

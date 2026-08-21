@@ -9,7 +9,7 @@ import math
 
 
 class MapsAdapter:
-    GEOFENCE_METERS = 250  # a check-in must be within this radius of the store
+    GEOFENCE_METERS = 100  # a check-in must be within this radius of the store
 
     @staticmethod
     def distance_meters(lat1, lng1, lat2, lng2):

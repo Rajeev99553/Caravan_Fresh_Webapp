@@ -78,21 +78,39 @@ def visit_detail(visit_id):
 def checkin(visit_id):
     v = data.get("visits", visit_id) or abort(404)
     require_store_access(current_user, v.store)
-    try:
-        lat = float(request.form.get("lat") or 0)
-        lng = float(request.form.get("lng") or 0)
-    except ValueError:
-        lat = lng = 0
-    valid, dist = maps.validate_checkin(v.store, lat, lng)
-    data.update("visits", v.id, check_in_at=datetime.utcnow(), check_in_lat=lat,
-                check_in_lng=lng, gps_valid=valid, status="in_progress")
-    log_action(current_user, "checkin", "Visit", v.id, f"gps_valid={valid} dist={dist}m")
-    data.commit()
-    if valid:
-        flash(f"Checked in. GPS validated ({dist} m from store).", "success")
+    lat_raw = (request.form.get("lat") or "").strip()
+    lng_raw = (request.form.get("lng") or "").strip()
+    no_gps_reason = (request.form.get("no_gps_reason") or "").strip()
+
+    if lat_raw and lng_raw:
+        try:
+            lat = float(lat_raw)
+            lng = float(lng_raw)
+        except ValueError:
+            flash("Invalid GPS coordinates received — please try again.", "danger")
+            return redirect(url_for("audit.visit_detail", visit_id=v.id))
+        valid, dist = maps.validate_checkin(v.store, lat, lng)
+        if not valid:
+            flash(f"You are {dist} m from {v.store.name} — check-in requires being within "
+                  f"{maps.GEOFENCE_METERS} m of the store. Move closer and try again, or use "
+                  f"\"Check in without GPS\" and provide a reason.", "danger")
+            return redirect(url_for("audit.visit_detail", visit_id=v.id))
+        data.update("visits", v.id, check_in_at=datetime.utcnow(), check_in_lat=lat,
+                    check_in_lng=lng, gps_valid=valid, no_gps_reason=None,
+                    status="in_progress")
+        log_action(current_user, "checkin", "Visit", v.id, f"gps_valid={valid} dist={dist}m")
+        data.commit()
+        flash(f"Checked in. GPS validated ({dist} m from store). You can now begin the audit.", "success")
     else:
-        flash(f"Checked in, but GPS is outside the store geofence "
-              f"(distance {dist} m). Flagged for review.", "warning")
+        if not no_gps_reason:
+            flash("Select a reason before checking in without GPS.", "danger")
+            return redirect(url_for("audit.visit_detail", visit_id=v.id))
+        data.update("visits", v.id, check_in_at=datetime.utcnow(), check_in_lat=None,
+                    check_in_lng=None, gps_valid=None, no_gps_reason=no_gps_reason,
+                    status="in_progress")
+        log_action(current_user, "checkin_no_gps", "Visit", v.id, no_gps_reason)
+        data.commit()
+        flash(f"Checked in without GPS ({no_gps_reason}). You can now begin the audit.", "warning")
     return redirect(url_for("audit.visit_detail", visit_id=v.id))
 
 
@@ -102,6 +120,9 @@ def checkin(visit_id):
 def submit_scores(visit_id):
     v = data.get("visits", visit_id) or abort(404)
     require_store_access(current_user, v.store)
+    if not v.check_in_at:
+        flash("You must check in at the store before starting the audit.", "danger")
+        return redirect(url_for("audit.visit_detail", visit_id=v.id))
     checkpoints = data.all_("checkpoint_master", active=True,
                             order_by="category, is_critical DESC, code")
     upload_dir = current_app.config["UPLOAD_FOLDER"]

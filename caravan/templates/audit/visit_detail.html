@@ -21,23 +21,49 @@
       <p class="mb-1"><i class="bi bi-clock"></i> Checked in {{ v.check_in_at.strftime('%d %b %H:%M') }}</p>
       {% if v.gps_valid %}
         <span class="badge bg-success"><i class="bi bi-check-circle"></i> GPS validated (within geofence)</span>
-      {% else %}
+        <div class="small text-muted mt-1">Lat {{ '%.5f'|format(v.check_in_lat or 0) }}, Lng {{ '%.5f'|format(v.check_in_lng or 0) }} — {{ maps_link(v.check_in_lat, v.check_in_lng, label='View check-in on map') }}</div>
+      {% elif v.gps_valid == False %}
         <span class="badge bg-danger"><i class="bi bi-exclamation-triangle"></i> GPS outside geofence — flagged</span>
+        <div class="small text-muted mt-1">Lat {{ '%.5f'|format(v.check_in_lat or 0) }}, Lng {{ '%.5f'|format(v.check_in_lng or 0) }} — {{ maps_link(v.check_in_lat, v.check_in_lng, label='View check-in on map') }}</div>
+      {% else %}
+        <span class="badge bg-secondary"><i class="bi bi-geo"></i> Checked in without GPS</span>
+        {% if v.no_gps_reason %}<div class="small text-muted mt-1">Reason: {{ v.no_gps_reason }}</div>{% endif %}
       {% endif %}
-      <div class="small text-muted mt-1">Lat {{ '%.5f'|format(v.check_in_lat or 0) }}, Lng {{ '%.5f'|format(v.check_in_lng or 0) }} — {{ maps_link(v.check_in_lat, v.check_in_lng, label='View check-in on map') }}</div>
     {% elif current_user.role == 'audit_officer' %}
-      <p class="small text-muted mb-2">Confirm you are physically at the store before starting the audit.</p>
+      <p class="small text-muted mb-2">Confirm you are physically at the store before starting the audit. You cannot begin the audit until you check in.</p>
       <form method="post" action="{{ url_for('audit.checkin', visit_id=v.id) }}" id="checkinForm">
         <input type="hidden" name="lat" id="lat"><input type="hidden" name="lng" id="lng">
+        <input type="hidden" name="no_gps_reason" id="noGpsReasonFinal">
         <button type="button" class="btn btn-success" style="background:#0f5132;border:none;" onclick="doCheckin()"><i class="bi bi-geo-alt-fill"></i> Check in with GPS</button>
-        <button type="submit" class="btn btn-outline-secondary btn-sm">Check in without GPS</button>
+        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="document.getElementById('noGpsBox').classList.toggle('d-none')">Check in without GPS</button>
         <div id="geoStatus" class="small text-muted mt-2"></div>
+        <div id="noGpsBox" class="d-none mt-3 p-3 border rounded bg-light">
+          <label class="form-label small fw-semibold">Reason for checking in without GPS <span class="text-danger">*</span></label>
+          <select id="noGpsReason" class="form-select form-select-sm mb-2" onchange="document.getElementById('noGpsOtherBox').classList.toggle('d-none', this.value !== 'Other')">
+            <option value="">Select a reason…</option>
+            <option value="Device GPS unavailable">Device GPS unavailable</option>
+            <option value="Location permission denied">Location permission denied</option>
+            <option value="Poor network / signal">Poor network / signal</option>
+            <option value="Indoor location, GPS inaccurate">Indoor location, GPS inaccurate</option>
+            <option value="Other">Other</option>
+          </select>
+          <div id="noGpsOtherBox" class="d-none mb-2">
+            <label class="form-label small fw-semibold">Please specify the reason <span class="text-danger">*</span></label>
+            <textarea id="noGpsOtherText" class="form-control form-control-sm" rows="2"
+                      placeholder="Describe why GPS check-in wasn't possible (visible to management/admin)"></textarea>
+          </div>
+          <button type="button" class="btn btn-sm btn-outline-secondary" onclick="submitNoGps()">Confirm check-in without GPS</button>
+        </div>
       </form>
     {% else %}<span class="text-muted">Not checked in.</span>{% endif %}
   </div>
 </div>
 
 {# ---- Checkpoints scoring ---- #}
+{% set editable = current_user.role == 'audit_officer' and v.status != 'completed' and v.check_in_at %}
+{% if current_user.role == 'audit_officer' and v.status != 'completed' and not v.check_in_at %}
+<div class="alert alert-warning"><i class="bi bi-lock"></i> Check in at the store above to unlock the audit checkpoints.</div>
+{% else %}
 <form method="post" action="{{ url_for('audit.submit_scores', visit_id=v.id) }}" enctype="multipart/form-data" id="auditForm">
 <div class="card mb-3">
   <div class="card-header d-flex justify-content-between align-items-center">
@@ -45,32 +71,41 @@
     <span class="small text-muted" id="progressLabel">0 of {{ checkpoints|length }} checkpoints completed</span>
   </div>
   <div class="card-body">
-    {% set editable = current_user.role == 'audit_officer' and v.status != 'completed' %}
     {% for category, cps in checkpoints|groupby('category') %}
       <div class="fw-semibold text-uppercase small text-muted mt-2 mb-2 {% if not loop.first %}border-top pt-3{% endif %}">{{ category or 'General' }}</div>
       {% for cp in cps %}
         {% set r = results.get(cp.id) %}
+        {% set answer = '' %}
+        {% if r and r.score is not none %}{% set answer = 'yes' if r.score >= 0.5 * cp.max_score else 'no' %}{% endif %}
         <div class="border rounded p-2 mb-2 checkpoint-row" data-critical="{{ 'true' if cp.is_critical else 'false' }}" data-maxscore="{{ cp.max_score }}">
-          <div class="d-flex justify-content-between">
+          <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
             <div><span class="fw-semibold">{{ cp.name }}</span>
               {% if cp.is_critical %}<span class="badge bg-danger ms-1">Critical</span>{% endif %}
-              <div class="small text-muted">max {{ cp.max_score }}{% if current_user.role != 'audit_officer' %} · weight {{ cp.weight }}{% endif %}</div></div>
-            <div style="min-width:90px">
-              <input type="number" step="0.5" min="0" max="{{ cp.max_score }}" name="score_{{ cp.id }}"
-                     value="{{ r.score if r else '' }}" class="form-control form-control-sm text-center score-input"
-                     placeholder="0–{{ cp.max_score }}" {% if not editable %}readonly{% endif %}>
+              <div class="small text-muted">{% if current_user.role != 'audit_officer' %}weight {{ cp.weight }}{% endif %}</div></div>
+            <div class="btn-group btn-group-sm answer-toggle" role="group">
+              <input type="radio" class="btn-check yn-input" name="score_{{ cp.id }}" id="yes_{{ cp.id }}"
+                     value="{{ cp.max_score }}" autocomplete="off" {% if answer=='yes' %}checked{% endif %} {% if not editable %}disabled{% endif %}>
+              <label class="btn btn-outline-success" for="yes_{{ cp.id }}">Yes</label>
+              <input type="radio" class="btn-check yn-input" name="score_{{ cp.id }}" id="no_{{ cp.id }}"
+                     value="0" autocomplete="off" {% if answer=='no' %}checked{% endif %} {% if not editable %}disabled{% endif %}>
+              <label class="btn btn-outline-danger" for="no_{{ cp.id }}">No</label>
             </div>
           </div>
-          <div class="row g-2 mt-1">
+          <div class="row g-2 mt-2">
             <div class="col-md-8">
               <input type="text" name="remark_{{ cp.id }}" value="{{ r.remark if r else '' }}"
-                     class="form-control form-control-sm remark-input" placeholder="Remark"
-                     {% if cp.is_critical %}data-required-below-threshold="1"{% endif %}
+                     class="form-control form-control-sm remark-input" placeholder="Action Item"
                      {% if not editable %}readonly{% endif %}>
-              <div class="small text-danger critical-hint d-none">Required — score is below the pass threshold</div>
+              <div class="small text-danger critical-hint d-none">Action Item required — checkpoint answered "No"</div>
             </div>
             <div class="col-md-4">
-              {% if editable %}<input type="file" name="photo_{{ cp.id }}" accept="image/*" capture="environment" class="form-control form-control-sm photo-input">{% endif %}
+              {% if editable %}
+                <div class="d-flex gap-1 align-items-center photo-widget" data-target="photo_{{ cp.id }}">
+                  <input type="file" name="photo_{{ cp.id }}" accept="image/*" capture="environment" class="form-control form-control-sm photo-input d-none">
+                  <button type="button" class="btn btn-sm btn-outline-secondary take-photo-btn"><i class="bi bi-camera"></i> Take Photo</button>
+                  <span class="small text-success photo-filename d-none"><i class="bi bi-check-circle-fill"></i> <span class="fname"></span></span>
+                </div>
+              {% endif %}
               {% if r and r.photo_path %}<a href="{{ url_for('media', filename=r.photo_path) }}" target="_blank" class="small"><i class="bi bi-image"></i> evidence</a>{% endif %}
             </div>
           </div>
@@ -82,7 +117,7 @@
       <textarea name="visit_remarks" class="form-control" rows="2" {% if not editable %}readonly{% endif %}>{{ v.remarks or '' }}</textarea>
     </div>
   </div>
-  {% if current_user.role == 'audit_officer' and v.status != 'completed' %}
+  {% if editable %}
   <div class="card-footer bg-white d-flex gap-2">
     <button name="complete" value="0" class="btn btn-outline-secondary">Save draft</button>
     <button name="complete" value="1" class="btn btn-success" style="background:#0f5132;border:none;"><i class="bi bi-check2-all"></i> Submit Audit</button>
@@ -90,6 +125,7 @@
   {% endif %}
 </div>
 </form>
+{% endif %}
 
 {% if v.audit_score is not none and current_user.role != 'audit_officer' %}
 <div class="alert alert-light border d-flex justify-content-between align-items-center">
@@ -103,26 +139,70 @@
 </div>
 {% endif %}
 
-{% if current_user.role == 'audit_officer' and v.status not in ('completed','missed') %}
-<form method="post" action="{{ url_for('audit.mark_missed', visit_id=v.id) }}" class="mt-2"
-      onsubmit="return confirm('Mark this visit as missed?')">
-  <input type="text" name="reason" class="form-control form-control-sm d-inline w-auto" placeholder="Reason (optional)">
-  <button class="btn btn-sm btn-outline-danger">Mark missed</button>
-</form>
-{% endif %}
+{# ---- Shared camera capture modal ---- #}
+<div class="modal fade" id="cameraModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header py-2">
+        <span class="fw-semibold small">Take evidence photo</span>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body text-center">
+        <video id="cameraStream" autoplay playsinline class="w-100 rounded bg-dark" style="max-height:60vh"></video>
+        <canvas id="cameraCanvas" class="d-none"></canvas>
+        <div id="cameraError" class="small text-danger mt-2 d-none">Camera unavailable. Please allow camera access in your browser and try again.</div>
+      </div>
+      <div class="modal-footer py-2">
+        <button type="button" class="btn btn-sm btn-success" style="background:#0f5132;border:none;" id="captureBtn"><i class="bi bi-camera-fill"></i> Capture</button>
+      </div>
+    </div>
+  </div>
+</div>
 {% endblock %}
 {% block scripts %}
 <script>
+function distMeters(lat1,lng1,lat2,lng2){
+  var R=6371000;
+  var p1=lat1*Math.PI/180, p2=lat2*Math.PI/180;
+  var dphi=(lat2-lat1)*Math.PI/180, dlmb=(lng2-lng1)*Math.PI/180;
+  var a=Math.sin(dphi/2)*Math.sin(dphi/2) + Math.cos(p1)*Math.cos(p2)*Math.sin(dlmb/2)*Math.sin(dlmb/2);
+  return 2*R*Math.asin(Math.sqrt(a));
+}
+var STORE_LAT = {{ (v.store.latitude if v.store.latitude is not none else 'null') }};
+var STORE_LNG = {{ (v.store.longitude if v.store.longitude is not none else 'null') }};
+var GEOFENCE_M = 100;
+
 function doCheckin(){
   var s=document.getElementById('geoStatus');
-  if(!navigator.geolocation){s.textContent='Geolocation not supported; submitting without GPS.';document.getElementById('checkinForm').submit();return;}
+  if(!navigator.geolocation){s.textContent='Geolocation not supported on this device/browser. Use "Check in without GPS" below.';return;}
   s.textContent='Requesting location…';
   navigator.geolocation.getCurrentPosition(function(p){
+    if (STORE_LAT !== null && STORE_LNG !== null) {
+      var d = distMeters(p.coords.latitude, p.coords.longitude, STORE_LAT, STORE_LNG);
+      if (d > GEOFENCE_M) {
+        s.textContent='';
+        alert('You are ' + Math.round(d) + ' m away from the store. You must be within ' + GEOFENCE_M + ' m to check in with GPS. Please move closer, or use "Check in without GPS" and provide a reason.');
+        return;
+      }
+    }
     document.getElementById('lat').value=p.coords.latitude;
     document.getElementById('lng').value=p.coords.longitude;
     document.getElementById('checkinForm').submit();
-  },function(e){s.textContent='Location denied/unavailable — submitting without GPS.';document.getElementById('checkinForm').submit();},
+  },function(e){s.textContent='Location denied/unavailable — use "Check in without GPS" below.';},
   {enableHighAccuracy:true,timeout:8000});
+}
+function submitNoGps(){
+  var reason = document.getElementById('noGpsReason').value;
+  if(!reason){alert('Please select a reason.');return;}
+  if(reason === 'Other'){
+    var other = document.getElementById('noGpsOtherText').value.trim();
+    if(!other){alert('Please describe the reason.');return;}
+    reason = 'Other: ' + other;
+  }
+  document.getElementById('noGpsReasonFinal').value = reason;
+  document.getElementById('lat').value='';
+  document.getElementById('lng').value='';
+  document.getElementById('checkinForm').submit();
 }
 
 (function(){
@@ -133,28 +213,90 @@ function doCheckin(){
   function refresh(){
     var done = 0;
     rows.forEach(function(row){
-      var scoreInput = row.querySelector('.score-input');
+      var checked = row.querySelector('.yn-input:checked');
       var remarkInput = row.querySelector('.remark-input');
       var hint = row.querySelector('.critical-hint');
       var isCritical = row.dataset.critical === 'true';
-      var maxScore = parseFloat(row.dataset.maxscore || '10');
-      var val = scoreInput.value;
-      if (val !== '') done++;
-      if (isCritical && hint) {
-        var below = val !== '' && parseFloat(val) < 0.5 * maxScore;
-        hint.classList.toggle('d-none', !below);
-        if (remarkInput) remarkInput.classList.toggle('is-invalid', below && !remarkInput.value.trim());
+      if (checked) done++;
+      var isNo = checked && checked.value === '0';
+      if (hint) {
+        var needsAction = isCritical && isNo;
+        hint.classList.toggle('d-none', !needsAction);
+        if (remarkInput) remarkInput.classList.toggle('is-invalid', needsAction && !remarkInput.value.trim());
       }
     });
     if (progressLabel) progressLabel.textContent = done + ' of ' + total + ' checkpoints completed';
   }
   rows.forEach(function(row){
-    var scoreInput = row.querySelector('.score-input');
+    row.querySelectorAll('.yn-input').forEach(function(inp){ inp.addEventListener('change', refresh); });
     var remarkInput = row.querySelector('.remark-input');
-    if (scoreInput) scoreInput.addEventListener('input', refresh);
     if (remarkInput) remarkInput.addEventListener('input', refresh);
   });
   refresh();
+})();
+
+// ---- Desktop + mobile camera capture ----
+(function(){
+  var modalEl = document.getElementById('cameraModal');
+  if (!modalEl || !window.bootstrap) return;
+  var modal = new bootstrap.Modal(modalEl);
+  var video = document.getElementById('cameraStream');
+  var canvas = document.getElementById('cameraCanvas');
+  var errorBox = document.getElementById('cameraError');
+  var captureBtn = document.getElementById('captureBtn');
+  var stream = null;
+  var activeWidget = null;
+
+  function stopStream(){
+    if (stream) { stream.getTracks().forEach(function(t){ t.stop(); }); stream = null; }
+  }
+
+  function openCameraFor(widget){
+    activeWidget = widget;
+    errorBox.classList.add('d-none');
+    video.classList.remove('d-none');
+    modal.show();
+    navigator.mediaDevices && navigator.mediaDevices.getUserMedia
+      ? navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}}).then(function(s){
+          stream = s; video.srcObject = s;
+        }).catch(function(){
+          video.classList.add('d-none'); errorBox.classList.remove('d-none');
+        })
+      : (video.classList.add('d-none'), errorBox.classList.remove('d-none'));
+  }
+
+  function setFileOnWidget(widget, file){
+    var input = widget.querySelector('.photo-input');
+    var dt = new DataTransfer();
+    dt.items.add(file);
+    input.files = dt.files;
+    var fnSpan = widget.querySelector('.photo-filename');
+    var fname = widget.querySelector('.fname');
+    fname.textContent = file.name;
+    fnSpan.classList.remove('d-none');
+  }
+
+  document.querySelectorAll('.take-photo-btn').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var widget = btn.closest('.photo-widget');
+      openCameraFor(widget);
+    });
+  });
+
+  captureBtn.addEventListener('click', function(){
+    if (!stream) return;
+    canvas.width = video.videoWidth || 640;
+    canvas.height = video.videoHeight || 480;
+    canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+    canvas.toBlob(function(blob){
+      if (!blob || !activeWidget) return;
+      var file = new File([blob], 'evidence_' + Date.now() + '.jpg', {type:'image/jpeg'});
+      setFileOnWidget(activeWidget, file);
+      modal.hide();
+    }, 'image/jpeg', 0.9);
+  });
+
+  modalEl.addEventListener('hidden.bs.modal', stopStream);
 })();
 </script>
 {% endblock %}
